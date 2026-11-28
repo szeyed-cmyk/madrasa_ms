@@ -1,0 +1,7 @@
+# Development / test tools, exact pins. Hash-locked in requirements-dev.lock:
+#   pip install --require-hashes -r requirements-dev.lock
+-r requirements.txt
+pytest==9.2.0
+httpx2==2.16.2
+ruff==0.17.6
+pip-audit==2.10.1

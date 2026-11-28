@@ -1,0 +1,47 @@
+{# Sticky top bar of the app (1.0.5): menu button (phones/tablets), page title, language and currency switchers,
+   demo role switch, user menu. Expects `user`; `topbar_title` (Alpine expression) is optional. #}
+{% import "_icons.html" as ic %}
+<header class="topbar" data-topbar>
+  <button type="button" @click="navOpen = true" class="btn-icon lg:hidden -ms-2" aria-label="{{ t('common.open_menu', 'Open menu') }}" :aria-expanded="navOpen">{{ ic.icon('menu', 'h-6 w-6') }}</button>
+  <div class="min-w-0 flex-1">
+    <p class="hidden sm:block text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 truncate">{{ brand_name }}</p>
+    <p class="font-display text-[15px] sm:text-base font-bold text-slate-900 truncate" {% if topbar_title %}x-text="{{ topbar_title }}"{% endif %}>{{ topbar_static or '' }}</p>
+  </div>
+  {% if currencies and currencies|length > 1 %}
+  <label class="hidden md:flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 h-10 text-sm text-slate-600 shadow-sm" title="{{ t('top.currency', 'Display currency') }}">
+    {{ ic.icon('coins', 'h-4 w-4 text-slate-400') }}
+    <select class="bg-transparent text-sm font-semibold focus:outline-none" data-currency-switch aria-label="{{ t('top.currency', 'Display currency') }}">
+      {% for c in currencies %}<option value="{{ c.code }}">{{ c.code }}</option>{% endfor %}
+    </select>
+  </label>
+  {% endif %}
+  {% if languages and languages|length > 1 %}
+  <form method="post" action="/set-language" class="flex items-center" data-lang-form>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="next" value="{{ request.url.path }}">
+    <label class="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 h-10 text-sm text-slate-600 shadow-sm">
+      {{ ic.icon('globe', 'h-4 w-4 text-slate-400') }}
+      <select name="lang" class="bg-transparent text-sm font-semibold focus:outline-none max-w-[6.5rem]" data-autosubmit aria-label="{{ t('top.language', 'Language') }}" data-lang-switch>
+        {% for l in languages %}<option value="{{ l.code }}" {% if l.code == lang_code %}selected{% endif %}>{{ l.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <noscript><button class="btn btn-light btn-sm">OK</button></noscript>
+  </form>
+  {% endif %}
+  {% if demo_mode %}<a href="/login" class="hidden sm:inline-flex btn btn-soft btn-sm h-10" data-switch-role>{{ ic.icon('refresh', 'h-4 w-4') }} {{ t('demo.switch_role', 'Switch role') }}</a>{% endif %}
+  <div class="relative" x-data="{ open: false }" @keydown.escape="open = false" @click.outside="open = false">
+    <button type="button" @click="open = !open" class="flex items-center gap-2 rounded-xl ps-1 pe-2 h-10 hover:bg-slate-100" :aria-expanded="open" aria-haspopup="menu" data-user-menu>
+      <span class="h-8 w-8 rounded-full bg-gradient-to-br from-brand-400 to-brand-700 text-white flex items-center justify-center text-sm font-bold uppercase">{{ (user.full_name or user.username)[:1] }}</span>
+      <span class="hidden md:block text-start leading-tight"><span class="block text-sm font-semibold text-slate-800 max-w-[9rem] truncate">{{ user.full_name or user.username }}</span><span class="block text-[11px] text-slate-500">{{ t('role.' ~ user.role, user.role|capitalize) }}</span></span>
+      {{ ic.icon('chevron-down', 'h-4 w-4 text-slate-400 hidden md:block') }}
+    </button>
+    <div x-show="open" x-cloak x-transition.origin.top class="menu" role="menu">
+      <div class="px-3 py-2 border-b border-slate-100 mb-1"><p class="text-sm font-semibold text-slate-900 truncate">{{ user.full_name or user.username }}</p><p class="text-xs text-slate-500 truncate">{{ user.username }}</p></div>
+      {% if demo_mode %}<a href="/login" class="menu-item sm:hidden" role="menuitem">{{ ic.icon('refresh', 'h-4 w-4') }} {{ t('demo.switch_role', 'Switch role') }}</a>{% endif %}
+      <a href="/" class="menu-item" role="menuitem">{{ ic.icon('globe', 'h-4 w-4') }} {{ t('top.home_page', 'Home page') }}</a>
+      <a href="/change-password" class="menu-item" role="menuitem">{{ ic.icon('key', 'h-4 w-4') }} {{ t('common.change_password', 'Change password') }}</a>
+      <form method="post" action="/logout"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="menu-item text-red-600 hover:bg-red-50" role="menuitem">{{ ic.icon('logout', 'h-4 w-4') }} {{ t('common.logout', 'Log out') }}</button></form>
+    </div>
+  </div>
+</header>
+<div x-show="loading" x-cloak class="progress-bar" role="progressbar" aria-label="Loading"><span></span></div>

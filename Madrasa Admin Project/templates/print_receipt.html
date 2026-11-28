@@ -1,0 +1,22 @@
+{% extends "_print_base.html" %}
+{% block title %}Receipt {{ p.receipt_no }}{% endblock %}
+{% block content %}
+<div class="sheet bg-white max-w-xl mx-auto my-6 p-8 shadow">
+  {% include "_print_header.html" %}
+  <h2 class="text-center text-lg font-semibold mb-4">Fee Receipt {% if p.is_void %}<span class="text-red-600">(VOID)</span>{% endif %}</h2>
+  <table class="w-full text-sm">
+    <tr class="border-b"><td class="py-2 text-slate-500">Receipt no</td><td class="py-2 font-mono font-semibold">{{ p.receipt_no }}</td></tr>
+    <tr class="border-b"><td class="py-2 text-slate-500">Date</td><td class="py-2">{{ p.date }}</td></tr>
+    <tr class="border-b"><td class="py-2 text-slate-500">Student</td><td class="py-2">{{ p.student_name }} (ID {{ student.student_id if student else '' }})</td></tr>
+    <tr class="border-b"><td class="py-2 text-slate-500">Admission no</td><td class="py-2">{{ p.admission_no }}</td></tr>
+    <tr class="border-b"><td class="py-2 text-slate-500">Class</td><td class="py-2">{{ class_name }}{% if section_name %} - {{ section_name }}{% endif %}</td></tr>
+    <tr class="border-b"><td class="py-2 text-slate-500">Fee</td><td class="py-2">{{ p.fee_head }}{% if p.fee_month %} — {{ p.fee_month }}{% endif %}</td></tr>
+    <tr class="border-b"><td class="py-2 text-slate-500">Payment method</td><td class="py-2">{{ p.method }}</td></tr>
+    {% if p.note %}<tr class="border-b"><td class="py-2 text-slate-500">Note</td><td class="py-2">{{ p.note }}</td></tr>{% endif %}
+    <tr class="border-b"><td class="py-2 text-slate-500">Collected by</td><td class="py-2">{{ p.collected_by }}</td></tr>
+  </table>
+  <p class="text-3xl font-bold text-center text-emerald-700 my-6">{{ currency }} {{ '{:,.2f}'.format(p.amount) }}</p>
+  <div class="grid grid-cols-2 gap-10 mt-12 text-xs text-center text-slate-600"><div class="border-t pt-1">Received by</div><div class="border-t pt-1">Guardian</div></div>
+  <p class="text-center text-xs text-slate-500 mt-6">Thank you. This is a computer generated receipt.</p>
+</div>
+{% endblock %}

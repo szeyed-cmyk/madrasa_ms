@@ -1,0 +1,66 @@
+/* Demo sign-in box on /login, shown only when DEMO_MODE=true.
+   Colours and structure match the usual 'Demo sign-in' card pattern (dashed pink border, red action). */
+.demo-logins {
+  margin-top: 1.25rem;
+  border: 1px dashed #f1b3ae;
+  background: #fff7f6;
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+.demo-logins-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #b3342c;
+  margin: 0 0 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.demo-login {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  width: 100%;
+  text-align: start;
+  background: #fff;
+  border: 1px solid #f0d6d3;
+  border-radius: 6px;
+  padding: 0.55rem 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: #21263c;
+  cursor: pointer;
+  box-shadow: none;
+}
+.demo-login:hover, .demo-login:focus-visible {
+  border-color: #E8453C;
+  outline: none;
+}
+.demo-login-label { font-weight: 600; color: #21263c; }
+.demo-login-row { color: #21263c; line-height: 1.45; }
+.demo-login-row span { color: #6b7280; }
+.demo-login-row b { font-weight: 700; color: #21263c; font-family: inherit; }
+.demo-login-use {
+  color: #E8453C;
+  font-weight: 600;
+  margin-top: 0.15rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  text-align: start;
+  font-family: inherit;
+}
+.demo-login-use:hover { text-decoration: underline; }
+.demo-oneclick-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

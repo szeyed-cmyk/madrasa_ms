@@ -1,0 +1,14 @@
+{% extends "_print_base.html" %}
+{% block title %}Student list — {{ class_name }}{% endblock %}
+{% block content %}
+<div class="sheet bg-white max-w-4xl mx-auto my-6 p-8 shadow">
+  {% include "_print_header.html" %}
+  <h2 class="text-center text-lg font-semibold mb-4">Student List — {{ class_name }} ({{ rows|length }})</h2>
+  <table class="w-full text-xs border border-slate-300">
+    <thead class="bg-slate-100"><tr><th class="border border-slate-300 px-2 py-1">ID</th><th class="border border-slate-300 px-2 py-1">Roll</th><th class="border border-slate-300 px-2 py-1 text-start">Name</th><th class="border border-slate-300 px-2 py-1">Class</th><th class="border border-slate-300 px-2 py-1 text-start">Guardian</th><th class="border border-slate-300 px-2 py-1">Phone</th><th class="border border-slate-300 px-2 py-1">Status</th></tr></thead>
+    <tbody>{% for s in rows %}<tr><td class="border border-slate-300 px-2 py-1 font-mono">{{ s.student_id }}</td><td class="border border-slate-300 px-2 py-1 text-center">{{ s.roll_no if s.roll_no is not none else '-' }}</td><td class="border border-slate-300 px-2 py-1">{{ s.name }}</td><td class="border border-slate-300 px-2 py-1">{{ s.class_name }} - {{ s.section_name }}</td><td class="border border-slate-300 px-2 py-1">{{ s.guardian_name or '-' }}</td><td class="border border-slate-300 px-2 py-1">{{ s.guardian_phone or '-' }}</td><td class="border border-slate-300 px-2 py-1">{{ s.status }}</td></tr>
+    {% else %}<tr><td colspan="7" class="p-3 text-center text-slate-500">No students.</td></tr>{% endfor %}</tbody>
+  </table>
+  <p class="text-[10px] text-slate-400 text-center mt-6">Printed {{ today }}</p>
+</div>
+{% endblock %}

@@ -1,0 +1,90 @@
+/* 1.0.6 product-tour steps. Boxes are [x, y, width, height] in 1920×1080 screenshot pixels. */
+window.TOUR = {
+  chapters: [
+    "Dashboard",
+    "Students",
+    "Attendance",
+    "Exams & results",
+    "Fees",
+    "Class routine",
+    "Settings",
+    "Teacher & student"
+  ],
+  screens: {
+    dashboard:  { src: "/static/tour/shots/dashboard.jpg",  w: 1920, h: 1080 },
+    students:   { src: "/static/tour/shots/students.jpg",   w: 1920, h: 1080 },
+    attendance: { src: "/static/tour/shots/attendance.jpg", w: 1920, h: 1080 },
+    exams:      { src: "/static/tour/shots/exams.jpg",      w: 1920, h: 1080 },
+    fees:       { src: "/static/tour/shots/fees.jpg",       w: 1920, h: 1080 },
+    routine:    { src: "/static/tour/shots/routine.jpg",    w: 1920, h: 1080 },
+    settings:   { src: "/static/tour/shots/settings.jpg",   w: 1920, h: 1080 },
+    teacher:    { src: "/static/tour/shots/teacher.jpg",    w: 1920, h: 1080 },
+    student:    { src: "/static/tour/shots/student.jpg",    w: 1920, h: 1080 }
+  },
+  steps: [
+    { ch: 0, screen: "dashboard", box: [0, 0, 248, 1080],
+      title: "Everything in one menu",
+      body: "Students, teachers, the class routine, exams, attendance, fees and settings are all here. The menu groups daily work so staff can find it quickly." },
+    { ch: 0, screen: "dashboard", box: [248, 0, 1672, 72],
+      title: "The page you are on",
+      body: "The top bar shows the current page, and lets you switch language or the display currency without leaving the screen." },
+    { ch: 0, screen: "dashboard", box: [268, 88, 1628, 300],
+      title: "Today at a glance",
+      body: "Stat cards show active students, today’s attendance, this month’s collection and outstanding dues — the numbers a principal checks first." },
+    { ch: 0, screen: "dashboard", box: [268, 400, 1020, 340],
+      title: "Fees and attendance trends",
+      body: "Charts cover fee collection over recent months and attendance over the last days, so patterns show up before they become a problem." },
+
+    { ch: 1, screen: "students", box: [268, 88, 1628, 140],
+      title: "The student register",
+      body: "Search, filter by class and add or import students. Each record holds the class, roll, guardian and photo." },
+    { ch: 1, screen: "students", box: [268, 240, 1628, 780],
+      title: "A full class list",
+      body: "The table is the daily working list: open a profile, print a class list, or jump into marks and fees from here." },
+
+    { ch: 2, screen: "attendance", box: [268, 88, 1628, 160],
+      title: "Take attendance in a few taps",
+      body: "Pick the class, section and date. Mark present, absent or late for the whole class, then save once." },
+    { ch: 2, screen: "attendance", box: [268, 260, 1628, 760],
+      title: "The daily sheet",
+      body: "Each student’s status is one control away. Monthly reports and a percentage on the profile follow automatically." },
+
+    { ch: 3, screen: "exams", box: [268, 88, 1628, 150],
+      title: "Exams and publication",
+      body: "Create a term exam, enter marks in a grid, then publish when the office is ready. Unpublished exams stay hidden from students." },
+    { ch: 3, screen: "exams", box: [268, 250, 1628, 770],
+      title: "Results, GPA and merit",
+      body: "The result list shows GPA, merit position and any failing subject. Result cards print with the school logo and branding." },
+
+    { ch: 4, screen: "fees", box: [268, 88, 1628, 160],
+      title: "Fee plans and collection",
+      body: "Set a monthly fee per class, then collect payments against it. Each payment gets a printable receipt." },
+    { ch: 4, screen: "fees", box: [268, 260, 1628, 760],
+      title: "Dues and receipts",
+      body: "See who still owes, void a payment with an audit trail, and print a dues list for the office." },
+
+    { ch: 5, screen: "routine", box: [268, 88, 1628, 150],
+      title: "The weekly timetable",
+      body: "Periods, teacher assignments and a grid per class section. The app checks for clashes before a slot is saved." },
+    { ch: 5, screen: "routine", box: [268, 250, 1628, 770],
+      title: "Class and teacher views",
+      body: "Print a routine for a class or for a teacher. Teachers see only their own timetable when they sign in." },
+
+    { ch: 6, screen: "settings", box: [268, 88, 240, 720],
+      title: "Everything the school can change",
+      body: "Branding, currencies, languages, email (SMTP), payment gateways and SMS are all in Settings — no code changes." },
+    { ch: 6, screen: "settings", box: [530, 120, 1360, 880],
+      title: "Your name, logo and colours",
+      body: "The primary and secondary colours apply across the app, the landing page and the login screen as soon as you save." },
+
+    { ch: 7, screen: "teacher", box: [0, 0, 248, 1080],
+      title: "A teacher sees only their classes",
+      body: "The same app, a smaller menu: own students, attendance, assigned subjects and the teaching routine. Fees and settings stay with the administrator." },
+    { ch: 7, screen: "teacher", box: [268, 168, 1628, 500],
+      title: "Marks and attendance for assigned work",
+      body: "A teacher can enter marks only for subjects they are assigned. The server enforces that rule, not just the screen." },
+    { ch: 7, screen: "student", box: [80, 40, 1760, 1000],
+      title: "The student portal",
+      body: "A student signs in to see published results, attendance, fee status and the class routine — only their own record, on any phone." }
+  ]
+};

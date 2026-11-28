@@ -1,0 +1,49 @@
+{% extends "_print_base.html" %}
+{% block content %}
+{% if not cards %}<div class="sheet bg-white max-w-3xl mx-auto my-6 p-8 shadow">No students found for this selection.</div>{% endif %}
+{% for c in cards %}
+<div class="sheet bg-white max-w-3xl mx-auto my-6 p-8 shadow {% if not loop.last %}page-break{% endif %}">
+  {% include "_print_header.html" %}
+  <h2 class="text-center text-lg font-semibold mb-1">Academic Result Card</h2>
+  <p class="text-center text-sm text-slate-600 mb-4">{{ exam.name if exam else 'No exam' }}{% if exam and exam.exam_date %} · {{ exam.exam_date }}{% endif %}</p>
+  <table class="w-full text-sm mb-4">
+    <tr><td class="py-0.5 text-slate-500 w-32">Student</td><td class="font-semibold">{{ c.student.name }}</td><td class="text-slate-500 w-28">Student ID</td><td class="font-mono">{{ c.student.student_id }}</td></tr>
+    <tr><td class="py-0.5 text-slate-500">Class</td><td>{{ c.student.class_name }} - {{ c.student.section_name }}</td><td class="text-slate-500">Roll</td><td>{{ c.student.roll_no if c.student.roll_no is not none else '-' }}</td></tr>
+    <tr><td class="py-0.5 text-slate-500">Admission no</td><td>{{ c.student.admission_no }}</td><td class="text-slate-500">Guardian</td><td>{{ c.student.guardian_name or '-' }}</td></tr>
+  </table>
+  <table class="w-full text-sm border border-slate-300">
+    <thead class="bg-slate-100"><tr>
+      <th class="border border-slate-300 px-2 py-1 text-start">Subject</th><th class="border border-slate-300 px-2 py-1">Full</th><th class="border border-slate-300 px-2 py-1">Pass</th>
+      <th class="border border-slate-300 px-2 py-1">Obtained</th><th class="border border-slate-300 px-2 py-1">Grade</th><th class="border border-slate-300 px-2 py-1">GP</th></tr></thead>
+    <tbody>
+    {% for s in c.subjects %}
+      <tr><td class="border border-slate-300 px-2 py-1">{{ s.subject }}</td><td class="border border-slate-300 px-2 py-1 text-center">{{ '%g'|format(s.max) }}</td>
+        <td class="border border-slate-300 px-2 py-1 text-center">{{ '%g'|format(s.pass_marks) if s.pass_marks is not none else '-' }}</td>
+        <td class="border border-slate-300 px-2 py-1 text-center">{{ '%g'|format(s.marks) if s.marks is not none else '-' }}</td>
+        <td class="border border-slate-300 px-2 py-1 text-center font-semibold {% if s.grade == 'F' %}text-red-600{% endif %}">{{ s.grade }}</td>
+        <td class="border border-slate-300 px-2 py-1 text-center">{{ '%.2f'|format(s.grade_point) if s.grade_point is not none else '-' }}</td></tr>
+    {% else %}
+      <tr><td colspan="6" class="border border-slate-300 px-2 py-3 text-center text-slate-500">No subjects assigned.</td></tr>
+    {% endfor %}
+    </tbody>
+    <tfoot class="bg-slate-50 font-semibold"><tr>
+      <td class="border border-slate-300 px-2 py-1">Total</td><td class="border border-slate-300 px-2 py-1 text-center">{{ '%g'|format(c.total_max) }}</td><td class="border border-slate-300"></td>
+      <td class="border border-slate-300 px-2 py-1 text-center">{{ '%g'|format(c.total_obtained) }}</td>
+      <td class="border border-slate-300 px-2 py-1 text-center">{{ c.grade }}</td><td class="border border-slate-300 px-2 py-1 text-center">{{ '%.2f'|format(c.gpa) }}</td></tr></tfoot>
+  </table>
+  <div class="grid grid-cols-4 gap-2 text-center text-sm mt-4">
+    <div class="border rounded p-2"><p class="text-xs text-slate-500">Percentage</p><p class="font-bold">{{ c.percentage }}%</p></div>
+    <div class="border rounded p-2"><p class="text-xs text-slate-500">GPA</p><p class="font-bold">{{ '%.2f'|format(c.gpa) }}</p></div>
+    <div class="border rounded p-2"><p class="text-xs text-slate-500">Result</p><p class="font-bold {% if c.status == 'Fail' %}text-red-600{% else %}text-emerald-700{% endif %}">{{ c.status }}</p></div>
+    <div class="border rounded p-2"><p class="text-xs text-slate-500">Position</p><p class="font-bold">{{ c.position or '-' }}</p></div>
+  </div>
+  {% set a = attendance.get(c.student.id) %}
+  {% if a and a.total %}<p class="text-xs text-slate-600 mt-3">Attendance: {{ a.counts.Present }} present, {{ a.counts.Absent }} absent, {{ a.counts.Late }} late, {{ a.counts.Leave }} leave ({{ a.percentage }}%).</p>{% endif %}
+  <p class="text-[11px] text-slate-500 mt-2">Grading: {{ scale_label }}. A subject below its pass marks is graded F.</p>
+  <div class="grid grid-cols-3 gap-6 mt-14 text-xs text-center text-slate-600">
+    <div class="border-t pt-1">Class Teacher</div><div class="border-t pt-1">Guardian</div><div class="border-t pt-1">Principal / Muhtamim</div>
+  </div>
+  <p class="text-[10px] text-slate-400 text-center mt-6">Printed {{ today }} · computer generated</p>
+</div>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,294 @@
+{% extends "_base.html" %}
+{% block title %}{{ brand_name }} — {{ t('lp.title', 'School & Madrasa Management System') }}{% endblock %}
+{% block styles %}<link rel="stylesheet" href="/static/css/landing.css?v={{ app_version }}">{% endblock %}
+{% block scripts %}<script src="/static/js/landing.js?v={{ app_version }}" defer></script>{% endblock %}
+{% block body_class %}lp-dark overflow-x-hidden{% endblock %}
+{% block body_attrs %}x-data="{ menu: false, shot: 'dashboard', scrolled: false, faq: null }" @scroll.window="scrolled = window.scrollY > 16" data-landing{% endblock %}
+{% block demo_banner %}{% endblock %}
+{% block body %}
+{% import "_icons.html" as ic %}
+{% if user %}
+  {% set cta_href = '/dashboard' %}
+  {% set cta_label = t('lp.open_app', 'Open dashboard') %}
+{% elif demo %}
+  {% set cta_href = '/login' %}
+  {% set cta_label = t('lp.live_demo', 'Live Demo') %}
+{% elif needs_setup %}
+  {% set cta_href = '/setup' %}
+  {% set cta_label = t('lp.get_started', 'Get started') %}
+{% else %}
+  {% set cta_href = '/login' %}
+  {% set cta_label = t('lp.sign_in', 'Live demo') %}
+{% endif %}
+{% set tour_href = '/tour?autostart=1' %}
+{% set nav_links = [
+  ('#features', 'lp.nav_features', 'Features'),
+  ('#screens', 'lp.nav_screens', 'Screens'),
+  ('#roles', 'lp.nav_roles', 'Roles'),
+  ('#how', 'lp.nav_how', 'How it works'),
+  ('#benefits', 'lp.nav_benefits', 'Benefits'),
+  ('#faq', 'lp.nav_faq', 'FAQ'),
+  ('#tech', 'lp.nav_tech', 'Technology'),
+] %}
+
+<header class="lp-head" :class="(scrolled || menu) && 'is-scrolled'">
+  <nav class="lp-nav" aria-label="Main">
+    <a href="/" class="lp-nav-brand">
+      {% if brand_logo %}<img src="{{ brand_logo }}" alt="">{% else %}<img src="/static/favicon.svg" alt="">{% endif %}
+      <span class="font-display truncate" data-brand-name>{{ brand_name }}</span>
+    </a>
+    <div class="lp-nav-links">
+      {% for href, key, label in nav_links %}
+      <a href="{{ href }}">{{ t(key, label) }}</a>
+      {% endfor %}
+    </div>
+    {% if languages and languages|length > 1 %}
+    <form method="post" action="/set-language" class="hidden sm:block" data-lang-form>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="next" value="/">
+      <label class="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 h-10 text-sm text-white">{{ ic.icon('globe', 'h-4 w-4 text-slate-300') }}
+        <select name="lang" data-autosubmit class="bg-transparent font-semibold focus:outline-none [&>option]:text-slate-900" aria-label="{{ t('top.language', 'Language') }}" data-lang-switch>
+          {% for l in languages %}<option value="{{ l.code }}" {% if l.code == lang_code %}selected{% endif %}>{{ l.name }}</option>{% endfor %}
+        </select></label>
+    </form>
+    {% endif %}
+    <a href="{{ cta_href }}" class="lp-btn-demo" data-live-demo="nav">{{ cta_label }}</a>
+    <a href="{{ tour_href }}" class="hidden sm:inline-flex lp-btn-tour" data-take-tour="nav">{{ t('lp.take_tour', 'Take the tour') }}</a>
+    <button type="button" class="lp-nav-toggle lp-btn-ghost xl:hidden btn-icon" @click="menu = !menu" :aria-expanded="menu" aria-label="{{ t('common.open_menu', 'Open menu') }}">{{ ic.icon('menu', 'h-6 w-6') }}</button>
+  </nav>
+  <div class="lp-mobile-menu xl:hidden" x-show="menu" x-cloak x-transition>
+    {% for href, key, label in nav_links %}
+    <a href="{{ href }}" @click="menu = false">{{ t(key, label) }}</a>
+    {% endfor %}
+    <a href="{{ tour_href }}" @click="menu = false" data-take-tour="menu">{{ t('lp.take_tour', 'Take the tour') }}</a>
+    {% if not user %}<a href="{{ cta_href }}" @click="menu = false" data-live-demo="menu">{{ cta_label }}</a>{% endif %}
+  </div>
+</header>
+
+<main id="main">
+<section class="lp-hero" data-hero>
+  <div class="lp-hero-grid" aria-hidden="true"></div>
+  <div class="lp-hero-inner">
+    <div data-reveal>
+      <span class="lp-badge"><em>LIVE</em> {{ t('lp.badge', 'Branding, payments, SMTP, currencies and 3 languages built in') }}</span>
+      <h1 class="font-display">{{ t('lp.h1_a', 'School & Madrasa') }} <span class="lp-hero-accent">{{ t('lp.h1_b', 'Management System') }}</span></h1>
+      <p class="lp-sub">{{ t('lp.sub', 'Students, exams and result cards, attendance, fees, class routines and teachers in one fast, secure web app, with separate logins for administrators, teachers and students.') }}</p>
+      <div class="lp-hero-cta">
+        <a href="{{ cta_href }}" class="lp-btn-demo lp-btn-lg" data-live-demo="hero">{{ ic.icon('play') }} {{ cta_label }}</a>
+        <a href="{{ tour_href }}" class="lp-btn-tour lp-btn-lg" data-take-tour="hero">{{ t('lp.take_tour', 'Take the tour') }}</a>
+      </div>
+      <ul class="lp-chips">
+        {% for icon, key, label, sub in [
+          ('shield', 'lp.chip_roles', 'Admin · Teacher · Student', 'lp.chip_roles_s'),
+          ('globe', 'lp.chip_lang', 'English · বাংলা · العربية', 'lp.chip_lang_s'),
+          ('device', 'lp.chip_mobile', 'Desktop, tablet & mobile', 'lp.chip_mobile_s'),
+          ('print', 'lp.chip_print', 'Printable result cards', 'lp.chip_print_s'),
+        ] %}
+        <li class="lp-chip">{{ ic.icon(icon, 'h-5 w-5 text-brand-300') }}<span><strong>{{ t(key, label) }}</strong></span></li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="lp-mock" data-reveal>
+      <div class="lp-browser">
+        <div class="lp-browser-bar" aria-hidden="true"><i></i><i></i><i></i><em></em></div>
+        <img src="/static/img/landing/dashboard.webp" alt="{{ t('lp.alt_dashboard', 'Madrasa Pro dashboard with student, attendance and fee statistics and charts') }}" width="1600" height="1000" loading="eager">
+      </div>
+      <img src="/static/img/landing/mobile.webp" alt="{{ t('lp.alt_mobile', 'Madrasa Pro on a phone') }}" width="390" height="844" class="lp-phone" loading="lazy">
+    </div>
+  </div>
+</section>
+
+<section class="lp-stats" data-stats>
+  <div class="lp-container">
+    {% for value, key, label, delay in [('3', 'lp.stat_roles', 'user roles with their own logins', '1'), ('12+', 'lp.stat_modules', 'modules for daily school work', '2'), ('3', 'lp.stat_langs', 'languages incl. Arabic (RTL)', '3'), ('0', 'lp.stat_cdn', 'external CDNs: works offline on a LAN', '4')] %}
+    <div data-reveal data-reveal-delay="{{ delay }}"><strong class="font-display">{{ value }}</strong><span>{{ t(key, label) }}</span></div>
+    {% endfor %}
+  </div>
+</section>
+
+<section id="features" class="lp-section scroll-mt-24">
+  <div class="lp-container">
+    <div class="mx-auto max-w-2xl text-center" data-reveal>
+      <span class="lp-kicker">{{ ic.icon('sparkles', 'h-4 w-4') }} {{ t('lp.features_kicker', 'Key features') }}</span>
+      <h2 class="lp-h2 mt-5">{{ t('lp.features_title', 'Everything a school office needs, nothing it does not') }}</h2>
+      <p class="lp-lead mt-4">{{ t('lp.features_sub', 'Built with madrasas and schools: Hifz and general classes, Bangladesh and standard grading, Saturday-to-Thursday weeks.') }}</p>
+    </div>
+    <div class="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {% for icon, tk, title, dk, desc in [
+        ('students', 'lp.f_students', 'Student records', 'lp.f_students_d', 'One central profile per student: guardian, class, subjects, photo, CSV import and printable lists.'),
+        ('teacher', 'lp.f_teachers', 'Teachers & logins', 'lp.f_teachers_d', 'Teacher accounts, subject assignments and printable login slips for staff and students.'),
+        ('exams', 'lp.f_exams', 'Exams & result cards', 'lp.f_exams_d', 'Marks entry by subject or as a grid, GPA on the standard 4.00 or Bangladesh 5.00 scale, published result cards.'),
+        ('attendance', 'lp.f_att', 'Daily attendance', 'lp.f_att_d', 'Present, absent and late in a few taps, monthly reports and attendance percentage on every profile.'),
+        ('fees', 'lp.f_fees', 'Fees & receipts', 'lp.f_fees_d', 'Monthly fee plans per class, collection with printable receipts, dues lists and void with audit trail.'),
+        ('routine', 'lp.f_routine', 'Class routine', 'lp.f_routine_d', 'Weekly timetable per section and per teacher with clash checks and printable routines.'),
+        ('settings', 'lp.f_settings', 'Admin settings', 'lp.f_settings_d', 'Branding, SMTP email, payment gateways, SMS, currencies and languages, all without touching code.'),
+        ('layers', 'lp.f_classes', 'Classes & subjects', 'lp.f_classes_d', 'Grades, Hifz levels, sections and a subject catalogue that teachers and exams all share.'),
+        ('device', 'lp.f_portal', 'Student portal', 'lp.f_portal_d', 'Each student signs in to see published results, attendance, fees and the class routine on any phone.'),
+      ] %}
+      <article class="lp-feature" data-reveal>
+        <span class="lp-icon">{{ ic.icon(icon, 'h-6 w-6') }}</span>
+        <h3 class="mt-5 font-display text-lg font-bold">{{ t(tk, title) }}</h3>
+        <p class="mt-2 text-[15px] leading-relaxed">{{ t(dk, desc) }}</p>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section id="screens" class="lp-section scroll-mt-24">
+  <div class="lp-container">
+    <div class="mx-auto max-w-2xl text-center" data-reveal>
+      <span class="lp-kicker">{{ ic.icon('eye', 'h-4 w-4') }} {{ t('lp.screens_kicker', 'Screenshots') }}</span>
+      <h2 class="lp-h2 mt-5">{{ t('lp.screens_title', 'A clean, modern interface on every screen') }}</h2>
+    </div>
+    {% set shots = [('dashboard', 'lp.s_dashboard', 'Dashboard'), ('students', 'lp.s_students', 'Students'), ('results', 'lp.s_results', 'Exams & results'), ('fees', 'lp.s_fees', 'Fees'), ('settings', 'lp.s_settings', 'Settings')] %}
+    <div class="mt-10 flex justify-center" data-reveal><div class="segmented" role="tablist">
+      {% for id, key, label in shots %}<button type="button" role="tab" class="tab" :class="shot === '{{ id }}' ? 'tab-on' : 'tab-off'" :aria-selected="shot === '{{ id }}'" @click="shot = '{{ id }}'" data-shot-tab="{{ id }}">{{ t(key, label) }}</button>{% endfor %}
+    </div></div>
+    <div class="relative mt-8 mx-auto max-w-6xl" data-reveal>
+      {% for id, key, label in shots %}
+      <figure class="lp-shot" {% if not loop.first %}x-cloak{% endif %} x-show="shot === '{{ id }}'" x-transition.opacity.duration.300ms>
+        <img src="/static/img/landing/{{ id }}.webp" alt="{{ t(key, label) }}" width="1600" height="1000" class="w-full" loading="lazy">
+      </figure>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section id="roles" class="lp-section relative overflow-hidden scroll-mt-24">
+  <div class="lp-container relative">
+    <div class="mx-auto max-w-2xl text-center" data-reveal>
+      <span class="lp-kicker">{{ ic.icon('layers', 'h-4 w-4') }} {{ t('lp.roles_kicker', 'For every role') }}</span>
+      <h2 class="lp-h2 mt-5">{{ t('lp.roles_title', 'One system, three kinds of users') }}</h2>
+      <p class="lp-lead mt-4">{{ t('lp.roles_sub', 'Every role sees only what it should. The server checks the role on every request.') }}</p>
+    </div>
+    <div class="mt-14 grid gap-5 lg:grid-cols-3">
+      {% for n, icon, tk, title, items in [
+        ('01', 'shield', 'lp.r_admin', 'Administrator', [('lp.r_admin_1', 'Set up classes, subjects, teachers and fee plans'), ('lp.r_admin_2', 'Collect fees and print receipts and dues lists'), ('lp.r_admin_3', 'Publish results and manage every setting')]),
+        ('02', 'teacher', 'lp.r_teacher', 'Teacher', [('lp.r_teacher_1', 'Take attendance for own classes'), ('lp.r_teacher_2', 'Enter marks for assigned subjects only'), ('lp.r_teacher_3', 'See the personal weekly routine')]),
+        ('03', 'cap', 'lp.r_student', 'Student', [('lp.r_student_1', 'View published results and print the result card'), ('lp.r_student_2', 'Check attendance and fee status'), ('lp.r_student_3', 'See the class routine on any phone')]),
+      ] %}
+      <article class="lp-dark-card" data-reveal>
+        <div class="flex items-center justify-between"><span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-500/20 text-brand-200">{{ ic.icon(icon, 'h-6 w-6') }}</span><span class="font-display text-4xl font-extrabold text-white/15">{{ n }}</span></div>
+        <h3 class="mt-5 font-display text-xl font-bold text-white">{{ t(tk, title) }}</h3>
+        <ul class="mt-4 space-y-3 text-[15px] text-slate-300">
+          {% for k, txt in items %}<li class="flex gap-2.5">{{ ic.icon('check', 'h-5 w-5 shrink-0 text-brand-400') }}<span>{{ t(k, txt) }}</span></li>{% endfor %}
+        </ul>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section id="how" class="lp-section scroll-mt-24">
+  <div class="lp-container">
+    <div class="mx-auto max-w-2xl text-center" data-reveal>
+      <span class="lp-kicker">{{ ic.icon('sparkles', 'h-4 w-4') }} {{ t('lp.how_kicker', 'How it works') }}</span>
+      <h2 class="lp-h2 mt-5">{{ t('lp.how_title', 'From first setup to a running school') }}</h2>
+      <p class="lp-lead mt-4">{{ t('lp.how_sub', 'Four steps on the first day. After that, attendance, fees and exams are everyday work.') }}</p>
+    </div>
+    <ol class="mt-14 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+      {% for n, tk, title, dk, desc in [
+        ('1', 'lp.how_1', 'Create your school', 'lp.how_1_d', 'Set the name, logo and colours, then review classes, subjects and the weekly periods.'),
+        ('2', 'lp.how_2', 'Add people', 'lp.how_2_d', 'Add teachers and students, assign subjects and print login slips so everyone can sign in.'),
+        ('3', 'lp.how_3', 'Run the daily work', 'lp.how_3_d', 'Take attendance, collect fees with receipts, enter marks and keep the class routine up to date.'),
+        ('4', 'lp.how_4', 'Share the results', 'lp.how_4_d', 'Publish exams, print result cards and dues lists, and let students see their own record.'),
+      ] %}
+      <li class="lp-dark-card" data-reveal data-reveal-delay="{{ n }}">
+        <span class="lp-step-num">{{ n }}</span>
+        <h3 class="mt-4 font-display text-lg font-bold text-white">{{ t(tk, title) }}</h3>
+        <p class="mt-2 text-[15px] leading-relaxed">{{ t(dk, desc) }}</p>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+</section>
+
+<section id="benefits" class="lp-section scroll-mt-24">
+  <div class="lp-container grid items-center gap-14 lg:grid-cols-2">
+    <div data-reveal="left">
+      <span class="lp-kicker">{{ ic.icon('trending', 'h-4 w-4') }} {{ t('lp.benefits_kicker', 'Benefits') }}</span>
+      <h2 class="lp-h2 mt-5">{{ t('lp.benefits_title', 'Less paperwork. More time for teaching.') }}</h2>
+      <p class="lp-lead mt-4">{{ t('lp.benefits_sub', 'Replace registers, spreadsheets and handwritten receipts with one system the whole school can use from any device.') }}</p>
+      <div class="mt-8 grid gap-4 sm:grid-cols-2">
+        {% for icon, tk, title, dk, desc in [
+          ('zap', 'lp.b_fast', 'Fast daily work', 'lp.b_fast_d', 'Attendance for a class in under a minute, marks entry with keyboard and mobile layouts.'),
+          ('shield', 'lp.b_secure', 'Secure by design', 'lp.b_secure_d', 'Hashed passwords, CSRF protection, role checks on every route, encrypted API keys.'),
+          ('palette', 'lp.b_brand', 'Your school, your brand', 'lp.b_brand_d', 'Logo, name, colours, currency and language are set in the admin panel.'),
+          ('device', 'lp.b_anywhere', 'Runs anywhere', 'lp.b_anywhere_d', 'Windows, Linux, Docker or cloud. One SQLite file, no external services required.'),
+        ] %}
+        <div class="lp-dark-card">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/15 text-brand-300">{{ ic.icon(icon) }}</span>
+          <h3 class="mt-3 font-display font-bold text-white">{{ t(tk, title) }}</h3>
+          <p class="mt-1.5 text-sm leading-relaxed">{{ t(dk, desc) }}</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="relative overflow-hidden rounded-[2rem]" data-reveal="right">
+      <div class="relative lp-shot"><img src="/static/img/landing/results.webp" alt="{{ t('lp.s_results', 'Exams & results') }}" width="1600" height="1000" class="w-full" loading="lazy"></div>
+    </div>
+  </div>
+</section>
+
+<section id="tech" class="py-16 border-y border-white/10 scroll-mt-24">
+  <div class="lp-container text-center" data-reveal>
+    <p class="eyebrow">{{ t('lp.tech_title', 'Built with a proven, lightweight stack') }}</p>
+    <ul class="mt-7 flex flex-wrap justify-center gap-3">
+      {% for name in ['Python 3.12', 'FastAPI', 'SQLAlchemy 2', 'SQLite', 'Jinja2', 'Tailwind CSS', 'Alpine.js', 'Docker'] %}
+      <li class="lp-tech-pill font-display">{{ name }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section id="faq" class="lp-section scroll-mt-24">
+  <div class="lp-container max-w-3xl">
+    <div class="text-center" data-reveal>
+      <span class="lp-kicker">{{ t('lp.faq_kicker', 'FAQ') }}</span>
+      <h2 class="lp-h2 mt-5">{{ t('lp.faq_title', 'Questions schools usually ask') }}</h2>
+    </div>
+    <div class="mt-10" data-reveal>
+      {% for i, qk, q, ak, a in [
+        (0, 'lp.faq_1_q', 'Do I need the internet to use it?', 'lp.faq_1_a', 'No. Install it on a computer or a school network and use it from a browser. The app ships its own CSS, fonts and scripts, with no external services required.'),
+        (1, 'lp.faq_2_q', 'Can teachers and students have their own logins?', 'lp.faq_2_a', 'Yes. Administrators see everything. Teachers only see the classes they teach. Students only see their own results, attendance, fees and routine. The server enforces this on every request.'),
+        (2, 'lp.faq_3_q', 'Does it work in Bangla or Arabic?', 'lp.faq_3_a', 'Yes. English, Bangla and Arabic are built in, and Arabic uses a right-to-left layout. You can add another language and type your own translations in Settings.'),
+        (3, 'lp.faq_4_q', 'Can I use our school name, logo and colours?', 'lp.faq_4_a', 'Yes. Settings > Branding sets the name, logo and colours, which then apply across the app, the landing page and printouts.'),
+        (4, 'lp.faq_5_q', 'What is in the live demo?', 'lp.faq_5_a', 'The login page shows a Demo sign-in box with an administrator, a teacher and a student account (no special start flag). For a sample school that resets on every restart, use start-demo.bat. On a real school set DEMO_LOGINS=false. You can also take the product tour without signing in.'),
+        (5, 'lp.faq_6_q', 'Will it keep our existing records if we upgrade?', 'lp.faq_6_a', 'Yes. Starting a new version keeps the data folder and runs any new database migrations automatically, after saving a backup copy.'),
+      ] %}
+      <div class="lp-faq-item">
+        <button type="button" class="lp-faq-q" :aria-expanded="faq === {{ i }}" @click="faq = faq === {{ i }} ? null : {{ i }}" data-faq="{{ i }}">
+          <span>{{ t(qk, q) }}</span>
+          <span class="text-slate-400 font-display text-xl leading-none" x-text="faq === {{ i }} ? '−' : '+'">+</span>
+        </button>
+        <div class="lp-faq-a" x-show="faq === {{ i }}" x-cloak x-transition>{{ t(ak, a) }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="lp-section">
+  <div class="lp-container">
+    <div class="lp-cta-wrap" data-reveal>
+      <div aria-hidden="true" class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgb(var(--brand-600)/0.45),transparent_60%)]"></div>
+      <div class="relative mx-auto max-w-2xl">
+        <h2 class="font-display text-3xl sm:text-5xl font-extrabold tracking-tight">{{ t('lp.cta_title', 'See it in action in one click') }}</h2>
+        <p class="mt-5 text-lg text-slate-300">{{ t('lp.cta_sub', 'Open the live demo and sign in as an administrator, a teacher or a student. The demo accounts are listed under the login form. Or take the product tour first.') }}</p>
+        <div class="mt-9 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+          <a href="{{ cta_href }}" class="lp-btn-demo lp-btn-lg" data-live-demo="cta">{{ ic.icon('play') }} {{ cta_label }}</a>
+          <a href="{{ tour_href }}" class="lp-btn-tour lp-btn-lg" data-take-tour="cta">{{ t('lp.take_tour', 'Take the tour') }}</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="lp-container flex flex-col sm:flex-row items-center justify-between gap-3 py-8 text-sm">
+    <div class="flex items-center gap-2.5"><img src="/static/favicon.svg" alt="" class="h-7 w-7"><span class="font-display font-bold">{{ brand_name }}</span><span class="text-slate-400">v{{ app_version }}</span></div>
+    <p>Developer: Syed Abue Tayeb Al-Zeyed</p>
+  </div>
+</footer>
+{% endblock %}

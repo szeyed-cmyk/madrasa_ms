@@ -1,0 +1,59 @@
+{% extends "_base.html" %}
+{% block title %}First-run setup — {{ brand_name }}{% endblock %}
+{% block body %}
+<div class="min-h-[100dvh] lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+  {% with logo=None, panel_title="First-run setup", panel_sub="Takes less than a minute", brand_attr=False %}{% include "_auth_panel.html" %}{% endwith %}
+  <main id="main" class="flex items-start lg:items-center justify-center px-4 py-8 sm:py-12">
+    <div class="w-full max-w-xl">
+      <div class="card p-6 sm:p-8 shadow-lift animate-fade-in-up">
+        <h1 class="font-display text-2xl font-extrabold tracking-tight text-slate-900">Welcome! Let's set up your system</h1>
+        <p class="text-slate-600 text-sm mt-2 mb-6">Create your administrator account. Choose the name shown across the app and your admin username and password.</p>
+        {% if error %}<div class="notice notice-error mb-4" role="alert">{{ error }}</div>{% endif %}
+        <form method="post" action="/setup" enctype="multipart/form-data" class="space-y-6" autocomplete="off">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <fieldset class="space-y-4">
+            <legend class="flex items-center gap-2 text-sm font-semibold text-slate-800 mb-3"><span class="h-6 w-6 rounded-full bg-brand-600 text-white text-xs flex items-center justify-center">1</span>Your app / institution</legend>
+            <div><label class="label" for="app_name">Name shown across the app *</label>
+              <input id="app_name" name="app_name" required maxlength="120" class="input" value="{{ form.app_name }}" placeholder="e.g. Al-Noor Madrasa">
+              <p class="help">Login page, menu, browser tab, result cards and receipts. You can change it later in Settings.</p></div>
+            <div><label class="label" for="tagline">Tagline (optional)</label>
+              <input id="tagline" name="tagline" maxlength="160" class="input" value="{{ form.tagline }}" placeholder="e.g. School & Madrasa Management System"></div>
+            <div x-data="{ preview: '', err: '' }" data-setup-logo>
+              <label class="label" for="su_logo">School logo (optional)</label>
+              <div class="flex items-center gap-3">
+                <span class="h-16 w-16 shrink-0 rounded-xl border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center overflow-hidden">
+                  <img x-show="preview" :src="preview" alt="Logo preview" class="h-full w-full object-contain" x-cloak>
+                  <img x-show="!preview" src="/static/favicon.svg" alt="" class="h-9 w-9 opacity-60">
+                </span>
+                <div class="min-w-0 flex-1">
+                  <input id="su_logo" name="logo" type="file" accept="image/png,image/jpeg,image/gif,image/webp" class="block w-full text-sm file:me-3 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-3 file:py-2 file:font-semibold file:text-emerald-700"
+                         @change="err = ''; const f = $event.target.files[0]; if (!f) { preview = ''; return; } if (f.size > 300 * 1024) { err = 'Logo is too large (max 300 KB).'; $event.target.value = ''; preview = ''; return; } const r = new FileReader(); r.onload = (e) => preview = e.target.result; r.readAsDataURL(f)">
+                  <p class="help">PNG, JPG, GIF or WebP, max 300 KB. Shown on the login page, in the menu and on printouts. You can change it later in Settings.</p>
+                  <p x-show="err" x-text="err" class="text-sm text-red-600" x-cloak></p>
+                </div>
+              </div>
+            </div>
+          </fieldset>
+          <hr class="border-slate-200">
+          <fieldset class="space-y-4">
+            <legend class="flex items-center gap-2 text-sm font-semibold text-slate-800 mb-3"><span class="h-6 w-6 rounded-full bg-brand-600 text-white text-xs flex items-center justify-center">2</span>Administrator account</legend>
+            <div class="grid sm:grid-cols-2 gap-4">
+              <div><label class="label" for="su_username">Admin username *</label>
+                <input id="su_username" name="username" required minlength="3" maxlength="64" pattern="[A-Za-z0-9_.\-]+" class="input" value="{{ form.username }}" autocomplete="username" autocapitalize="none"></div>
+              <div><label class="label" for="su_full_name">Your name (optional)</label>
+                <input id="su_full_name" name="full_name" maxlength="120" class="input" value="{{ form.full_name }}" autocomplete="name"></div>
+              <div><label class="label" for="su_password">Password * (min 8 characters)</label>
+                <input id="su_password" name="password" type="password" required minlength="8" maxlength="128" class="input" autocomplete="new-password"></div>
+              <div><label class="label" for="su_confirm">Confirm password *</label>
+                <input id="su_confirm" name="confirm_password" type="password" required minlength="8" maxlength="128" class="input" autocomplete="new-password"></div>
+            </div>
+            <p class="help">Keep this password safe. Teachers are added later on the Teachers page; student logins on the Student logins page.</p>
+          </fieldset>
+          <button type="submit" class="btn btn-primary w-full">Create administrator and open the app</button>
+        </form>
+      </div>
+      <p class="lg:hidden text-[10px] text-slate-400 mt-6 text-center">v{{ app_version }} · Developer: Syed Abue Tayeb Al-Zeyed</p>
+    </div>
+  </main>
+</div>
+{% endblock %}

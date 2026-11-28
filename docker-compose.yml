@@ -1,0 +1,28 @@
+# Madrasa Pro 1.0.8 - Docker Compose. Run from the archive root (the folder with this file):
+#   1. (optional) copy .env.example to .env and edit it - compose also starts without a .env
+#   2. docker compose up -d --build
+#   3. open http://localhost:8000 and create the administrator on the /setup page
+# Database, backups and the generated secret key live in the named volume "madrasa-data".
+# Backup:  docker compose cp web:/app/data/madrasa.db ./madrasa-backup.db
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: madrasa-pro:1.0.5
+    ports:
+      # Bound to localhost only: put nginx (HTTPS) in front for public access (HowToSetup.md).
+      - "127.0.0.1:${PORT:-8000}:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DATABASE_PATH=/app/data/madrasa.db
+    volumes:
+      - madrasa-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  madrasa-data:

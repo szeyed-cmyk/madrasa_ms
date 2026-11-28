@@ -1,0 +1,4 @@
+name,class_name,section_name,student_id,admission_no,roll_no,dob,gender,admission_date,status,guardian_name,guardian_relation,guardian_phone,address
+Abdullah Karim,Grade 2,A,,,1,2015-05-20,Male,2026-01-08,Active,Abdul Karim,Father,01811111111,Mirpur
+Sumaiya Noor,Grade 2,B,,,1,2015-08-02,Female,2026-01-08,Active,Nasrin Noor,Mother,01822222222,Uttara
+Hasan Ali,Hifz Level 2,A,,,1,2012-02-14,Male,2026-02-01,Active,Ali Hossain,Father,01833333333,Mohammadpur

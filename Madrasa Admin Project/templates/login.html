@@ -1,0 +1,80 @@
+{% extends "_base.html" %}
+{% block title %}{{ t('login.title', 'Log in') }} — {{ brand_name }}{% endblock %}
+{% block styles %}{% if demo %}<link rel="stylesheet" href="/static/css/login-demo.css?v={{ app_version }}">{% endif %}{% endblock %}
+{% block scripts %}<script src="/static/js/login-demo.js?v={{ app_version }}" defer></script>{% endblock %}
+{% block body %}
+{% import "_icons.html" as ic %}
+<div class="min-h-[100dvh] lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+  {% with logo=brand_logo, panel_title=brand_name, panel_sub=brand_tagline, brand_attr=False %}{% include "_auth_panel.html" %}{% endwith %}
+  <main id="main" class="relative flex flex-col px-4 py-6 sm:px-8">
+    <div class="flex items-center justify-between gap-3">
+      <a href="/" class="btn btn-ghost btn-sm" data-back-home>{{ ic.icon('back', 'h-4 w-4 rtl:rotate-180') }} {{ t('login.back_home', 'Home') }}</a>
+      <div class="flex items-center gap-2">
+        <a href="/tour?autostart=1" class="btn btn-ghost btn-sm" data-take-tour>{{ ic.icon('play', 'h-4 w-4') }} {{ t('lp.take_tour', 'Take the tour') }}</a>
+        {% if languages and languages|length > 1 %}
+        <form method="post" action="/set-language" data-lang-form>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="next" value="/login">
+          <label class="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 h-10 text-sm shadow-sm">{{ ic.icon('globe', 'h-4 w-4 text-slate-400') }}
+            <select name="lang" data-autosubmit class="bg-transparent font-semibold focus:outline-none" aria-label="{{ t('top.language', 'Language') }}" data-lang-switch>
+              {% for l in languages %}<option value="{{ l.code }}" {% if l.code == lang_code %}selected{% endif %}>{{ l.name }}</option>{% endfor %}
+            </select></label>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    <div class="flex-1 flex items-start lg:items-center justify-center py-8">
+    <div class="w-full max-w-[28rem] animate-fade-in-up">
+      <div class="mb-7">
+        <h1 class="font-display text-[1.9rem] font-extrabold tracking-tight text-slate-900">{{ t('login.welcome', 'Welcome back') }}</h1>
+        <p class="text-slate-500 mt-1.5" data-brand-name-line>{{ t('login.sub', 'Sign in to continue to') }} <span class="font-semibold text-slate-700" data-brand-name>{{ brand_name }}</span></p>
+      </div>
+      {% if error %}<div class="notice notice-error mb-4" role="alert">{{ ic.icon('x-circle', 'h-5 w-5 shrink-0') }}<span>{{ error }}</span></div>{% endif %}
+      <form method="post" action="/login" class="card p-5 sm:p-6 space-y-4" autocomplete="on" x-data="{ busy: false }" x-on:submit="busy = true" data-login-form>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div>
+          <label class="label" for="username">{{ t('login.username', 'Username') }}</label>
+          <input id="username" name="username" required maxlength="64" class="input" value="{{ username or '' }}" placeholder="{{ t('login.username_ph', 'Enter your username') }}" autocomplete="username" autocapitalize="none" {% if not demo %}autofocus{% endif %}>
+        </div>
+        <div>
+          <label class="label" for="password">{{ t('login.password', 'Password') }}</label>
+          <div class="relative">
+            <input id="password" name="password" type="password" required maxlength="128" class="input pe-12" placeholder="{{ t('login.password_ph', 'Enter your password') }}" autocomplete="current-password">
+            <button type="button" class="absolute end-1 top-1/2 -translate-y-1/2 btn-icon h-9 w-9" data-password-toggle aria-label="{{ t('login.show_password', 'Show password') }}">{{ ic.icon('eye', 'h-4 w-4') }}</button>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary w-full" :aria-busy="busy ? 'true' : 'false'">{{ t('login.submit', 'Log in') }}</button>
+        <p class="text-xs text-slate-500 text-center">{{ t('login.note', 'Teachers and students get their logins from the administrator.') }}</p>
+      </form>
+      {% if demo %}
+      <div class="demo-logins" data-demo-panel aria-label="{{ t('login.demo_signin', 'Demo sign-in') }}">
+        <div class="demo-logins-title" id="demo-title">{{ ic.icon('user', 'h-4 w-4') }} {{ t('login.demo_signin', 'Demo sign-in') }}</div>
+        {% for role, label, desc, username, password in demo_roles %}
+        <div class="demo-login" role="button" tabindex="0" data-demo-fill data-demo-role="{{ role }}" data-demo-user="{{ username }}" data-demo-password="{{ password }}">
+          <span class="demo-login-label">{{ t('login.role_' ~ role, label) }}</span>
+          <span class="demo-login-row"><span>{{ t('login.username', 'Username') }}:</span> <b dir="ltr">{{ username }}</b></span>
+          <span class="demo-login-row"><span>{{ t('login.password', 'Password') }}:</span> <b dir="ltr">{{ password }}</b></span>
+          <button type="button" class="demo-login-use" data-demo-signin data-demo-role="{{ role }}" data-demo-fill data-demo-user="{{ username }}" data-demo-password="{{ password }}">{{ t('login.signin_account', 'Sign in with this account') }} <span aria-hidden="true">→</span></button>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="demo-oneclick-sr">
+        {% for role, label, desc, username, password in demo_roles %}
+        <form method="post" action="/demo/login">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="role" value="{{ role }}">
+          <button type="submit" data-demo-oneclick="{{ role }}">{{ t('login.oneclick_' ~ role, 'One-click: ' ~ label) }}</button>
+        </form>
+        {% endfor %}
+      </div>
+      {% if demo_mode %}
+      <p class="help mt-3">{{ t('login.demo_note', 'Public demo: sample data only, reset on every restart.') }}</p>
+      {% else %}
+      <p class="help mt-3">{{ t('login.demo_logins_note', 'Demo accounts for trying the app. Set DEMO_LOGINS=false for a real school.') }}</p>
+      {% endif %}
+      {% endif %}
+      <p class="lg:hidden text-[10px] text-slate-400 mt-8 text-center">v{{ app_version }} · Developer: Syed Abue Tayeb Al-Zeyed</p>
+    </div>
+    </div>
+  </main>
+</div>
+{% endblock %}

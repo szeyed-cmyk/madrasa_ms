@@ -1,0 +1,12 @@
+line-length = 120
+target-version = "py311"
+extend-exclude = ["static", "data", "frontend"]
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+# B008: FastAPI Depends()/File() defaults are intended.
+ignore = ["B008", "SIM105", "SIM108"]
+
+[lint.per-file-ignores]
+# The v1.0 schema is kept verbatim as SQL in this test.
+"tests/test_misc.py" = ["E501"]

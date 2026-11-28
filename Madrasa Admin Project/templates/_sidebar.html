@@ -1,0 +1,63 @@
+{# App shell (1.0.5): dark sidebar (off-canvas drawer below 1024px, fixed from 1024px) grouped by area.
+   Links use /dashboard#page. Role-based: the server enforces the same rules (docs/ROUTES.md). #}
+{% import "_icons.html" as ic %}
+<div x-show="navOpen" x-cloak x-transition.opacity @click="navOpen = false" class="lg:hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 no-print" aria-hidden="true"></div>
+<aside :class="navOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full lg:translate-x-0 rtl:lg:translate-x-0'" @keydown.escape.window="navOpen = false"
+       class="no-print fixed lg:sticky top-0 start-0 z-50 h-[100dvh] w-[17.5rem] lg:w-[16.5rem] shrink-0 -translate-x-full rtl:translate-x-full lg:translate-x-0 rtl:lg:translate-x-0 bg-slate-950 text-white flex flex-col transition-transform duration-300 shadow-2xl lg:shadow-none"
+       aria-label="Main menu" data-sidebar>
+  <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-brand-700/35 to-transparent"></div>
+  <div class="relative px-4 h-16 flex items-center gap-3 border-b border-white/[0.07]">
+    {% if brand_logo %}<img src="{{ brand_logo }}" alt="" class="h-10 w-10 rounded-xl bg-white object-contain p-0.5 ring-1 ring-white/20">{% else %}<img src="/static/favicon.svg" alt="" class="h-10 w-10 rounded-xl ring-1 ring-white/20">{% endif %}
+    <div class="min-w-0 flex-1">
+      <p class="font-display font-bold leading-tight truncate">{{ brand_name }}</p>
+      {% if brand_tagline %}<p class="text-[11px] text-slate-400 truncate">{{ brand_tagline }}</p>{% endif %}
+    </div>
+    <button type="button" @click="navOpen = false" class="lg:hidden btn-icon text-slate-300 hover:bg-white/10" aria-label="{{ t('common.close_menu', 'Close menu') }}">{{ ic.icon('close') }}</button>
+  </div>
+  <nav class="relative flex-1 px-3 pb-4 overflow-y-auto">
+    {% if user.role in ('admin', 'teacher') %}
+    {# (group, id, admin label key/text, teacher label key/text, icon, roles) #}
+    {% set items = [
+      ('overview', 'dashboard', ('nav.dashboard', 'Dashboard'), ('nav.dashboard', 'Dashboard'), 'dashboard', ['admin','teacher']),
+      ('academics', 'students', ('nav.students', 'Students'), ('nav.my_students', 'My students'), 'students', ['admin','teacher']),
+      ('academics', 'teachers', ('nav.teachers', 'Teachers'), ('', ''), 'teacher', ['admin']),
+      ('academics', 'logins', ('nav.logins', 'Student logins'), ('', ''), 'key', ['admin']),
+      ('academics', 'classes', ('nav.classes', 'Classes'), ('', ''), 'classes', ['admin']),
+      ('academics', 'subjects', ('nav.subjects', 'Subjects'), ('nav.my_subjects', 'My subjects'), 'subjects', ['admin','teacher']),
+      ('academics', 'routine', ('nav.routine', 'Class routine'), ('nav.my_routine', 'My routine'), 'routine', ['admin','teacher']),
+      ('academics', 'exams', ('nav.exams', 'Exams & Results'), ('nav.marks_results', 'Marks & results'), 'exams', ['admin','teacher']),
+      ('academics', 'attendance', ('nav.attendance', 'Attendance'), ('nav.attendance', 'Attendance'), 'attendance', ['admin','teacher']),
+      ('finance', 'fees', ('nav.fees', 'Fees'), ('', ''), 'fees', ['admin']),
+      ('system', 'settings', ('nav.settings', 'Settings'), ('', ''), 'settings', ['admin']),
+    ] %}
+    {% set groups = {'overview': ('nav.group.overview', 'Overview'), 'academics': ('nav.group.academics', 'Academics'), 'finance': ('nav.group.finance', 'Finance'), 'system': ('nav.group.system', 'System')} %}
+    {% set ns = namespace(group='') %}
+    {% for group, id, alabel, tlabel, icon, roles in items if user.role in roles %}
+    {% if group != ns.group %}{% set ns.group = group %}<p class="nav-group">{{ t(groups[group][0], groups[group][1]) }}</p>{% endif %}
+    {% set lbl = tlabel if user.role == 'teacher' else alabel %}
+    <a href="/dashboard#{{ id }}" data-nav="{{ id }}" @click="navOpen = false"
+       :class="(typeof page !== 'undefined' && page === '{{ id }}') ? 'bg-white/[0.08] text-white ring-1 ring-inset ring-white/10 shadow-sm' : 'text-slate-400 hover:bg-white/[0.05] hover:text-white'"
+       :aria-current="(typeof page !== 'undefined' && page === '{{ id }}') ? 'page' : null"
+       class="navlink group">
+      <span class="flex h-8 w-8 items-center justify-center rounded-lg transition-colors" :class="(typeof page !== 'undefined' && page === '{{ id }}') ? 'bg-brand-500 text-white shadow-glow' : 'bg-white/[0.04] text-slate-400 group-hover:text-brand-300'">{{ ic.icon(icon, 'h-[18px] w-[18px]') }}</span>
+      <span>{{ t(lbl[0], lbl[1]) }}</span></a>
+    {% endfor %}
+    {% endif %}
+    {% if user.role == 'student' %}
+    <p class="nav-group">{{ t('nav.group.my_school', 'My school') }}</p>
+    {% set sitems = [('overview', 'nav.my_profile', 'My profile', 'user'), ('subjects', 'nav.my_results', 'My results', 'exams'), ('attendance', 'nav.my_attendance', 'My attendance', 'attendance'), ('fees', 'nav.my_fees', 'My fees', 'fees'), ('routine', 'nav.class_routine', 'Class routine', 'routine')] %}
+    {% for tab, key, label, icon in sitems %}
+    <a href="/student/{{ user.student_id }}#{{ tab }}" data-nav="{{ tab }}" @click="navOpen = false"
+       :class="(typeof tab !== 'undefined' && tab === '{{ tab }}') ? 'bg-white/[0.08] text-white ring-1 ring-inset ring-white/10' : 'text-slate-400 hover:bg-white/[0.05] hover:text-white'"
+       class="navlink group"><span class="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04] text-slate-300 group-hover:text-brand-300">{{ ic.icon(icon, 'h-[18px] w-[18px]') }}</span><span>{{ t(key, label) }}</span></a>
+    {% endfor %}
+    {% endif %}
+  </nav>
+  <div class="relative p-3 border-t border-white/[0.07] text-sm">
+    <div class="flex items-center gap-3 rounded-xl bg-white/[0.04] px-3 py-2.5">
+      <span class="h-9 w-9 rounded-full bg-gradient-to-br from-brand-400 to-brand-700 text-white flex items-center justify-center text-sm font-bold uppercase shrink-0">{{ (user.full_name or user.username)[:1] }}</span>
+      <span class="min-w-0 flex-1"><span class="block font-semibold text-white truncate">{{ user.full_name or user.username }}</span><span class="block text-xs text-slate-400">{{ t('role.' ~ user.role, user.role|capitalize) }}</span></span>
+    </div>
+    <p class="text-[10px] text-slate-500 px-2 pt-3">v{{ app_version }} · Developer: Syed Abue Tayeb Al-Zeyed</p>
+  </div>
+</aside>

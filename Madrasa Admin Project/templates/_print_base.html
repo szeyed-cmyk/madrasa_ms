@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}{{ title or 'Print' }}{% endblock %} — {{ brand_name }}</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/app.css?v={{ app_version }}">
+  <script src="/static/js/print.js?v={{ app_version }}" defer></script>
+  <style>
+    {% block page_rule %}@page { size: A4; margin: 12mm; }{% endblock %}
+    @media print { .sheet { box-shadow: none !important; border: none !important; margin: 0 !important; } .page-break { break-after: page; } }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900">
+  <div class="no-print sticky top-0 bg-slate-900 text-white px-4 py-2 flex gap-2 items-center justify-between z-10">
+    <span class="text-sm">{{ title or 'Print preview' }}</span>
+    <span class="flex gap-2"><button data-print class="btn btn-primary btn-sm">🖨 Print / Save as PDF</button><button data-close class="btn btn-light btn-sm">Close</button></span>
+  </div>
+  {% block content %}{% endblock %}
+</body>
+</html>

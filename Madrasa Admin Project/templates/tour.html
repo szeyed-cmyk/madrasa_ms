@@ -1,0 +1,55 @@
+{% extends "_base.html" %}
+{% block title %}{{ t('tour.title', 'Product tour') }} — {{ brand_name }}{% endblock %}
+{% block styles %}<link rel="stylesheet" href="/static/css/tour.css?v={{ app_version }}">{% endblock %}
+{% block scripts %}
+<script src="/static/js/tour-data.js?v={{ app_version }}" defer></script>
+<script src="/static/js/tour.js?v={{ app_version }}" defer></script>
+{% endblock %}
+{% block body_class %}tour-page bg-slate-950 text-white overflow-hidden{% endblock %}
+{% block body_attrs %}data-tour data-autostart="{{ '1' if autostart else '0' }}"{% endblock %}
+{% block demo_banner %}{% endblock %}
+{% block body %}
+{% import "_icons.html" as ic %}
+<div class="tour-top">
+  <a href="/tour?autostart=1" id="bReplay" class="tour-link">{{ t('tour.replay', 'Replay') }}</a>
+  <a href="/login" class="tour-link" data-live-demo="tour">{{ t('tour.try_demo', 'Try the live demo') }}</a>
+</div>
+
+<div id="stage" class="tour-stage">
+  <img id="shot" alt="" width="1920" height="1080">
+  <div id="hole" class="tour-hole" hidden></div>
+  <div id="pop" class="tour-pop" hidden>
+    <p id="ptag" class="tour-tag"></p>
+    <h2 id="ph" class="tour-h"></h2>
+    <p id="pp" class="tour-body"></p>
+    <p id="pa" class="tour-act"></p>
+    <div class="tour-pop-actions">
+      <button type="button" id="bSkip" class="tour-btn-text">{{ t('tour.skip', 'Skip') }}</button>
+      <span id="stepno" class="tour-stepno"></span>
+      <button type="button" id="bBack" class="tour-btn">{{ t('tour.back', 'Back') }}</button>
+      <button type="button" id="bNext" class="tour-btn tour-btn-on">{{ t('tour.next', 'Next') }}</button>
+    </div>
+  </div>
+</div>
+
+<footer id="bar" class="tour-bar">
+  <div class="tour-brand">
+    <img src="/static/favicon.svg" alt="">
+    <strong data-brand-name>{{ brand_name }}</strong>
+  </div>
+  <div class="tour-progress">
+    <p id="chap" class="tour-chap"></p>
+    <div id="segs" class="tour-segs" aria-hidden="true"></div>
+  </div>
+  <span class="tour-badge">DEMO DATA</span>
+    <div class="tour-controls">
+    <button type="button" id="bList" class="tour-icon" aria-label="{{ t('tour.chapters', 'Chapters') }}">{{ ic.icon('list', 'h-5 w-5') }}</button>
+    <div id="list" class="tour-list" hidden role="menu"></div>
+    <button type="button" id="bPrev" class="tour-icon" aria-label="{{ t('tour.back', 'Back') }}">{{ ic.icon('back', 'h-5 w-5 rtl:rotate-180') }}</button>
+    <button type="button" id="bPlay" class="tour-play" aria-label="{{ t('tour.play', 'Play') }}"></button>
+    <button type="button" id="bBarNext" class="tour-icon" aria-label="{{ t('tour.next', 'Next') }}">{{ ic.icon('chevron-right', 'h-5 w-5 rtl:rotate-180') }}</button>
+    <button type="button" id="bSpeed" class="tour-speed">1×</button>
+    <button type="button" id="bClose" class="tour-icon" aria-label="{{ t('tour.close', 'Close') }}">{{ ic.icon('close', 'h-5 w-5') }}</button>
+  </div>
+</footer>
+{% endblock %}

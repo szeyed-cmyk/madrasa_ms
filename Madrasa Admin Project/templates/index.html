@@ -1,0 +1,1173 @@
+{% extends "_base.html" %}
+{% block title %}{{ brand_name }}{% endblock %}
+{% block scripts %}<script src="/static/js/admin/students.js?v={{ app_version }}" defer></script><script src="/static/js/admin/exams.js?v={{ app_version }}" defer></script><script src="/static/js/admin/attendance.js?v={{ app_version }}" defer></script><script src="/static/js/admin/fees.js?v={{ app_version }}" defer></script><script src="/static/js/admin/routine.js?v={{ app_version }}" defer></script><script src="/static/js/admin/classes.js?v={{ app_version }}" defer></script><script src="/static/js/admin/accounts.js?v={{ app_version }}" defer></script><script src="/static/js/admin/settings.js?v={{ app_version }}" defer></script><script src="/static/js/app.js?v={{ app_version }}" defer></script>{% endblock %}
+{% block body_attrs %}x-data="adminApp()" x-init="init()" data-role="{{ user.role }}" data-user="{{ user.username }}"{% endblock %}
+{% block body %}
+{% import "_icons.html" as ic %}
+<div class="lg:flex min-h-screen">
+{% include "_sidebar.html" %}
+<div class="flex-1 min-w-0 flex flex-col">
+{% with topbar_title="pageLabel()" %}{% include "_topbar.html" %}{% endwith %}
+<main id="main" class="flex-1 min-w-0 w-full px-4 py-5 sm:px-6 md:py-8 lg:px-8 max-w-[1600px] mx-auto">
+
+<!-- ============================== DASHBOARD (1.0.5 redesign: hero, stat cards, charts, lists) -->
+<section x-show="page === 'dashboard'" x-cloak data-page="dashboard">
+  <div class="relative overflow-hidden rounded-3xl bg-slate-950 text-white p-5 sm:p-7 mb-6 shadow-lift animate-fade-in-up" data-dash-hero>
+    <div aria-hidden="true" class="pointer-events-none absolute -top-24 -end-10 h-72 w-72 rounded-full bg-brand-500/40 blur-3xl"></div>
+    <div aria-hidden="true" class="pointer-events-none absolute -bottom-28 start-1/3 h-64 w-64 rounded-full bg-accent-500/20 blur-3xl"></div>
+    <div class="relative flex flex-col lg:flex-row lg:items-center gap-5">
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium text-brand-200"><span x-text="MA.greeting()">{{ t('dash.welcome', 'Welcome') }}</span>, {{ user.full_name or user.username }}</p>
+        <h1 class="font-display mt-1 text-2xl sm:text-[2rem] font-extrabold tracking-tight">{{ t('nav.dashboard', 'Dashboard') }}</h1>
+        <p class="mt-1 text-sm text-slate-300" x-text="dash.today ? new Date(dash.today + 'T00:00').toLocaleDateString(document.documentElement.lang || undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : ''"></p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <a href="/dashboard#attendance" class="btn bg-white text-slate-900 hover:bg-brand-50">{{ ic.icon('attendance', 'h-4 w-4') }} {{ t('dash.take_attendance', 'Take attendance') }}</a>
+        <a href="/dashboard#exams" class="btn border border-white/20 bg-white/10 text-white hover:bg-white/15">{{ ic.icon('exams', 'h-4 w-4') }} {{ t('dash.enter_marks', 'Enter marks') }}</a>
+        {% if user.role == 'admin' %}<a href="/dashboard#fees" class="btn border border-white/20 bg-white/10 text-white hover:bg-white/15">{{ ic.icon('fees', 'h-4 w-4') }} {{ t('dash.collect_fee', 'Collect fee') }}</a>{% endif %}
+      </div>
+    </div>
+  </div>
+  <div x-show="role === 'teacher' && dash.my_assignments === 0 && !(dash.my_classes_today || []).length && dash.classes === 0" x-cloak class="notice notice-info mb-4" data-no-assignment>{{ ic.icon('alert', 'h-5 w-5 shrink-0') }}<span>No classes or subjects are assigned to you yet. Ask the administrator to assign your subjects (Teachers › Assign subjects).</span></div>
+
+  <!-- loading skeleton -->
+  <div x-show="!dash.today" class="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4 mb-5" data-skeleton>
+    <template x-for="i in 4" :key="i"><div class="card p-5 space-y-3"><div class="skeleton h-10 w-10 rounded-xl"></div><div class="skeleton h-3 w-24"></div><div class="skeleton h-7 w-16"></div></div></template>
+  </div>
+
+  <div x-show="dash.today" class="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4 mb-5" data-stats>
+    <a href="/dashboard#students" class="stat"><span class="stat-icon bg-brand-50 text-brand-700">{{ ic.icon('students') }}</span><span class="min-w-0"><span class="stat-label block" x-text="role === 'admin' ? MA.t('dash.active_students', 'Active students') : MA.t('nav.my_students', 'My students')">{{ t('dash.active_students', 'Active students') }}</span><span class="stat-value block" x-text="dash.students ?? '…'"></span><span class="block text-xs text-slate-400 truncate" x-text="role === 'admin' ? (dash.students_total ?? 0) + ' ' + MA.t('dash.in_database', 'in database') : (dash.classes ?? 0) + ' ' + MA.t('dash.classes_you_teach', 'class(es) you teach')"></span></span></a>
+    <a href="/dashboard#attendance" class="stat"><span class="stat-icon bg-sky-50 text-sky-700">{{ ic.icon('check-circle') }}</span><span class="min-w-0"><span class="stat-label block">{{ t('dash.present_absent', 'Present / absent today') }}</span><span class="stat-value block"><span class="text-emerald-600" x-text="(dash.attendance_today||{}).Present || 0"></span><span class="text-slate-300 font-normal"> / </span><span class="text-red-500" x-text="(dash.attendance_today||{}).Absent || 0"></span></span><span class="block text-xs text-slate-400" x-text="attRate() != null ? attRate() + '% ' + MA.t('dash.attendance_rate', 'attendance rate') : MA.t('dash.not_taken', 'Not taken yet today')"></span></span></a>
+    {% if user.role == 'admin' %}
+    <a href="/dashboard#fees" class="stat"><span class="stat-icon bg-accent-50 text-accent-700">{{ ic.icon('wallet') }}</span><span class="min-w-0"><span class="stat-label block">{{ t('dash.collected_month', 'Collected this month') }}</span><span class="stat-value block text-xl sm:text-2xl truncate" x-text="MA.money(dash.collected_month, cur)"></span><span class="block text-xs text-slate-400 truncate" x-text="MA.t('dash.all_time', 'All time') + ' ' + MA.money(dash.collected, cur)"></span></span></a>
+    <a href="/dashboard#fees" class="stat"><span class="stat-icon bg-red-50 text-red-600">{{ ic.icon('alert') }}</span><span class="min-w-0"><span class="stat-label block">{{ t('dash.dues', 'Fee dues (this year)') }}</span><span class="stat-value block text-xl sm:text-2xl text-red-600 truncate" x-text="MA.money(dash.dues_total, cur)"></span><span class="block text-xs text-slate-400 truncate" x-text="(dash.classes ?? 0) + ' ' + MA.t('dash.classes', 'classes') + ' · ' + (dash.subjects ?? 0) + ' ' + MA.t('dash.subjects', 'subjects')"></span></span></a>
+    {% else %}
+    <a href="/dashboard#routine" class="stat"><span class="stat-icon bg-violet-50 text-violet-700">{{ ic.icon('routine') }}</span><span class="min-w-0"><span class="stat-label block">{{ t('dash.my_classes_today', 'My classes today') }}</span><span class="stat-value block" x-text="(dash.my_classes_today || []).length"></span><span class="block text-xs text-slate-400 truncate">{{ t('dash.see_routine', 'See your weekly routine') }}</span></span></a>
+    <a href="/dashboard#subjects" class="stat"><span class="stat-icon bg-accent-50 text-accent-700">{{ ic.icon('subjects') }}</span><span class="min-w-0"><span class="stat-label block">{{ t('nav.my_subjects', 'My subjects') }}</span><span class="stat-value block" x-text="dash.my_assignments ?? '…'"></span><span class="block text-xs text-slate-400" x-text="(dash.classes ?? 0) + ' ' + MA.t('dash.classes', 'classes')"></span></span></a>
+    {% endif %}
+  </div>
+
+  <div class="grid lg:grid-cols-3 gap-4 md:gap-5">
+    {% if user.role == 'admin' %}
+    <!-- fee collection chart -->
+    <div class="card lg:col-span-2 min-w-0" data-chart="fees">
+      <div class="card-head"><div><h2 class="card-title">{{ t('dash.fee_chart', 'Fee collection') }}</h2><p class="card-sub">{{ t('dash.fee_chart_sub', 'Last 6 months') }}</p></div>
+        <span class="chip"><span class="dot bg-brand-500"></span><span x-text="MA.money((dash.fee_trend || []).reduce((a, b) => a + b.total, 0), cur)"></span></span></div>
+      <div class="px-4 sm:px-6 pb-5 pt-4">
+        <div class="flex h-52 items-end gap-2 sm:gap-4 border-b border-slate-100">
+          <template x-for="(m, i) in (dash.fee_trend || [])" :key="m.month">
+            <div class="group flex h-full flex-1 flex-col items-center justify-end gap-1.5">
+              <span class="text-[11px] font-semibold text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap" x-text="MA.money(m.total, cur)"></span>
+              <div class="w-full max-w-[3.25rem] rounded-t-xl transition-all duration-700" :class="i === (dash.fee_trend.length - 1) ? 'bg-gradient-to-t from-brand-700 to-brand-400 shadow-glow' : 'bg-gradient-to-t from-brand-200 to-brand-100 group-hover:from-brand-300'" :style="'height:' + Math.max(4, barPct(m.total, dash.fee_trend.map(x => x.total))) + '%'"></div>
+            </div>
+          </template>
+        </div>
+        <div class="mt-2 flex gap-2 sm:gap-4"><template x-for="m in (dash.fee_trend || [])" :key="'l' + m.month"><span class="flex-1 text-center text-xs font-medium text-slate-500" x-text="MA.monthShort(m.month)"></span></template></div>
+      </div>
+    </div>
+    {% endif %}
+    <!-- attendance donut -->
+    <div class="card min-w-0 {{ '' if user.role == 'admin' else 'lg:col-span-1' }}" data-chart="attendance-today">
+      <div class="card-head"><div><h2 class="card-title">{{ t('dash.att_today', 'Attendance today') }}</h2><p class="card-sub" x-text="dash.is_working_day === false ? MA.t('dash.not_working_day', 'Today is not a working day.') : MA.t('dash.att_today_sub', 'Present, late and absent')"></p></div></div>
+      <div class="flex items-center gap-6 px-4 sm:px-6 py-5">
+        <div class="relative h-36 w-36 shrink-0">
+          <svg viewBox="0 0 42 42" class="h-full w-full -rotate-90" aria-hidden="true">
+            <circle cx="21" cy="21" r="15.9155" fill="none" stroke="rgb(241 245 249)" stroke-width="5"></circle>
+            <circle cx="21" cy="21" r="15.9155" fill="none" stroke="rgb(var(--brand-500))" stroke-width="5" stroke-linecap="round" :stroke-dasharray="donut('Present') + ' ' + (100 - donut('Present'))" stroke-dashoffset="0"></circle>
+            <circle cx="21" cy="21" r="15.9155" fill="none" stroke="rgb(var(--accent-400))" stroke-width="5" :stroke-dasharray="donut('Late') + ' ' + (100 - donut('Late'))" :stroke-dashoffset="-donut('Present')"></circle>
+            <circle cx="21" cy="21" r="15.9155" fill="none" stroke="rgb(248 113 113)" stroke-width="5" :stroke-dasharray="donut('Absent') + ' ' + (100 - donut('Absent'))" :stroke-dashoffset="-(donut('Present') + donut('Late'))"></circle>
+          </svg>
+          <div class="absolute inset-0 flex flex-col items-center justify-center"><span class="font-display text-2xl font-extrabold text-slate-900" x-text="attRate() != null ? attRate() + '%' : '—'"></span><span class="text-[11px] text-slate-500">{{ t('dash.rate', 'rate') }}</span></div>
+        </div>
+        <ul class="space-y-2.5 text-sm min-w-0">
+          <li class="legend"><span class="dot bg-brand-500"></span>{{ t('att.present', 'Present') }} <b class="text-slate-800" x-text="(dash.attendance_today||{}).Present || 0"></b></li>
+          <li class="legend"><span class="dot bg-accent-400"></span>{{ t('att.late', 'Late') }} <b class="text-slate-800" x-text="(dash.attendance_today||{}).Late || 0"></b></li>
+          <li class="legend"><span class="dot bg-red-400"></span>{{ t('att.absent', 'Absent') }} <b class="text-slate-800" x-text="(dash.attendance_today||{}).Absent || 0"></b></li>
+        </ul>
+      </div>
+    </div>
+    <!-- attendance trend -->
+    <div class="card min-w-0 {{ 'lg:col-span-2' if user.role == 'admin' else 'lg:col-span-2' }}" data-chart="attendance-trend">
+      <div class="card-head"><div><h2 class="card-title">{{ t('dash.att_trend', 'Attendance trend') }}</h2><p class="card-sub">{{ t('dash.att_trend_sub', 'Daily attendance rate, recent school days') }}</p></div></div>
+      <div class="px-4 sm:px-6 pb-5 pt-3">
+        <template x-if="(dash.attendance_trend || []).length > 1">
+          <div>
+            <svg viewBox="0 0 600 180" preserveAspectRatio="none" class="h-44 w-full rtl:-scale-x-100" aria-hidden="true">
+              <defs><linearGradient id="attFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(var(--brand-500))" stop-opacity="0.28"></stop><stop offset="1" stop-color="rgb(var(--brand-500))" stop-opacity="0"></stop></linearGradient></defs>
+              <path d="M0 45 H600 M0 90 H600 M0 135 H600" stroke="rgb(241 245 249)" stroke-width="1.5" fill="none"></path>
+              <path :d="MA.areaPath(dash.attendance_trend.map(x => x.rate), 600, 180)" fill="url(#attFill)"></path>
+              <path :d="MA.linePath(dash.attendance_trend.map(x => x.rate), 600, 180)" fill="none" stroke="rgb(var(--brand-600))" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>
+            </svg>
+            <div class="mt-1 flex justify-between text-[11px] font-medium text-slate-400"><span x-text="MA.dayShort(dash.attendance_trend[0].date)"></span><span x-text="MA.dayShort(dash.attendance_trend[Math.floor(dash.attendance_trend.length / 2)].date)"></span><span x-text="MA.dayShort(dash.attendance_trend[dash.attendance_trend.length - 1].date)"></span></div>
+          </div>
+        </template>
+        <div x-show="(dash.attendance_trend || []).length <= 1" class="empty py-8"><span class="empty-icon">{{ ic.icon('chart', 'h-6 w-6') }}</span><span class="empty-title">{{ t('dash.no_trend', 'No trend yet') }}</span><span>{{ t('dash.no_trend_sub', 'The chart appears after attendance is taken on two or more days.') }}</span></div>
+      </div>
+    </div>
+    <!-- students per class -->
+    <div class="card min-w-0" data-chart="classes">
+      <div class="card-head"><div><h2 class="card-title">{{ t('dash.by_class', 'Students by class') }}</h2><p class="card-sub">{{ t('dash.by_class_sub', 'Active students') }}</p></div></div>
+      <ul class="px-4 sm:px-6 py-4 space-y-3.5">
+        <template x-for="(c, i) in (dash.class_breakdown || [])" :key="c.name">
+          <li><div class="flex justify-between text-sm"><span class="font-medium text-slate-700 truncate" x-text="c.name"></span><span class="font-semibold text-slate-900" x-text="c.count"></span></div>
+            <div class="mt-1.5 h-2 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full" :class="['bg-brand-500', 'bg-accent-400', 'bg-sky-400', 'bg-violet-400', 'bg-rose-400', 'bg-teal-400'][i % 6]" :style="'width:' + barPct(c.count, dash.class_breakdown.map(x => x.count)) + '%'"></div></div></li>
+        </template>
+        <li x-show="!(dash.class_breakdown || []).length" class="empty py-6"><span class="empty-icon">{{ ic.icon('students', 'h-6 w-6') }}</span><span>{{ t('dash.no_students', 'No students yet.') }}</span></li>
+      </ul>
+    </div>
+
+    <div class="card lg:col-span-2 min-w-0">
+      <div class="card-head">
+        <div><h2 class="card-title" x-text="role === 'admin' ? MA.t('dash.todays_classes_admin', 'Today\'s classes (my periods)') : MA.t('dash.my_classes_today', 'My classes today')"></h2><p class="card-sub" x-text="dash.is_working_day === false ? MA.t('dash.not_working_day', 'Today is not a working day.') : ((dash.my_classes_today || []).length + ' ' + MA.t('dash.periods', 'period(s)'))"></p></div>
+        <a href="/dashboard#routine" class="btn btn-light btn-sm">{{ ic.icon('routine', 'h-4 w-4') }} {{ t('nav.routine', 'Class routine') }}</a>
+      </div>
+      <ul class="p-2 sm:p-3" data-today-classes>
+        <template x-for="c in (dash.my_classes_today || [])" :key="c.id">
+          <li class="flex items-center gap-3 rounded-xl px-2 py-2.5 hover:bg-slate-50">
+            <span class="w-16 shrink-0 text-end"><span class="block text-sm font-semibold text-slate-800" x-text="c.start_time"></span><span class="block text-[11px] text-slate-400" x-text="c.end_time"></span></span>
+            <span class="h-10 w-1 rounded-full bg-brand-500 shrink-0"></span>
+            <span class="min-w-0 flex-1"><span class="block font-medium text-slate-900 truncate" x-text="c.subject_name"></span><span class="block text-xs text-slate-500 truncate" x-text="c.class_name + ' - ' + c.section_name + ' · ' + c.period_name + (c.room ? ' · ' + c.room : '')"></span></span>
+          </li>
+        </template>
+        <li x-show="!(dash.my_classes_today || []).length" class="empty py-8"><span class="empty-icon">{{ ic.icon('clock', 'h-6 w-6') }}</span><span class="empty-title">{{ t('dash.no_periods_title', 'No periods today') }}</span><span x-text="role === 'admin' ? MA.t('dash.no_periods_admin', 'You have no periods today. See the full class routine for every class.') : MA.t('dash.no_periods_teacher', 'No classes on your routine today.')"></span></li>
+      </ul>
+    </div>
+    <div class="card min-w-0">
+      <div class="card-head"><div><h2 class="card-title">{{ t('dash.activity', 'Recent activity') }}</h2><p class="card-sub">{{ t('dash.activity_sub', 'Latest attendance, marks and admissions') }}</p></div></div>
+      <ul class="p-2 sm:p-3" data-activity>
+        <template x-for="(a, i) in (dash.activity || [])" :key="i">
+          <li class="flex items-start gap-3 rounded-xl px-2 py-2">
+            <span class="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center text-[11px] font-bold"
+                  :class="({attendance: 'bg-sky-50 text-sky-700', marks: 'bg-violet-50 text-violet-700', student: 'bg-brand-50 text-brand-700', payment: 'bg-accent-50 text-accent-700'})[a.kind] || 'bg-slate-100 text-slate-600'"
+                  x-text="({attendance: 'AT', marks: 'MK', student: 'ST', payment: 'RC'})[a.kind] || '•'"></span>
+            <span class="min-w-0 flex-1"><span class="block text-sm text-slate-800 break-words" x-text="a.text"></span><span class="block text-xs text-slate-400" x-text="MA.when(a.when) + (a.by ? ' · ' + a.by : '')"></span></span>
+          </li>
+        </template>
+        <li x-show="!(dash.activity || []).length" class="empty py-8"><span class="empty-icon">{{ ic.icon('activity', 'h-6 w-6') }}</span><span class="empty-title">{{ t('dash.nothing_yet', 'Nothing yet.') }}</span></li>
+      </ul>
+    </div>
+    <div class="card card-pad lg:col-span-2 min-w-0">
+      <h2 class="card-title mb-4">{{ t('dash.quick_actions', 'Quick actions') }}</h2>
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+        {% if user.role == 'admin' %}<a href="/dashboard#students" @click="$nextTick(() => openStudentForm())" class="group rounded-2xl border border-slate-200 p-3.5 text-center hover:border-brand-300 hover:bg-brand-50/50 transition-all"><span class="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-700 group-hover:bg-brand-600 group-hover:text-white transition-colors">{{ ic.icon('plus') }}</span><span class="text-sm font-semibold text-slate-700">{{ t('dash.add_student', 'Add student') }}</span></a>{% endif %}
+        {% for href, icon, key, label in [('attendance', 'attendance', 'nav.attendance', 'Attendance'), ('exams', 'exams', 'dash.marks', 'Marks'), ('routine', 'routine', 'dash.routine', 'Routine')] %}
+        <a href="/dashboard#{{ href }}" class="group rounded-2xl border border-slate-200 p-3.5 text-center hover:border-brand-300 hover:bg-brand-50/50 transition-all"><span class="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-700 group-hover:bg-brand-600 group-hover:text-white transition-colors">{{ ic.icon(icon) }}</span><span class="text-sm font-semibold text-slate-700">{{ t(key, label) }}</span></a>
+        {% endfor %}
+        {% if user.role == 'admin' %}<a href="/dashboard#fees" class="group rounded-2xl border border-slate-200 p-3.5 text-center hover:border-brand-300 hover:bg-brand-50/50 transition-all"><span class="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-700 group-hover:bg-brand-600 group-hover:text-white transition-colors">{{ ic.icon('fees') }}</span><span class="text-sm font-semibold text-slate-700">{{ t('dash.collect_fee', 'Collect fee') }}</span></a>{% endif %}
+      </div>
+    </div>
+    {% if user.role == 'admin' %}<div class="card min-w-0">
+      <div class="card-head"><h2 class="card-title">{{ t('dash.recent_payments', 'Recent payments') }}</h2><a href="/dashboard#fees" class="text-sm font-semibold text-brand-700 hover:underline">{{ t('common.view_all', 'View all') }}</a></div>
+      <ul class="p-2 sm:p-3">
+        <template x-for="p in (dash.recent_payments || [])" :key="p.id">
+          <li class="flex items-center justify-between gap-3 text-sm px-2 py-2 rounded-xl hover:bg-slate-50"><span class="flex items-center gap-2.5 min-w-0"><span class="h-8 w-8 shrink-0 rounded-full bg-accent-50 text-accent-700 flex items-center justify-center">{{ ic.icon('fees', 'h-4 w-4') }}</span><span class="min-w-0"><span class="block truncate font-medium text-slate-800" x-text="p.student_name"></span><span class="block font-mono text-[11px] text-slate-400" x-text="p.receipt_no"></span></span></span><span class="font-semibold shrink-0 text-slate-900" x-text="MA.money(p.amount, cur)"></span></li>
+        </template>
+        <li x-show="!(dash.recent_payments || []).length" class="empty py-6"><span class="empty-icon">{{ ic.icon('fees', 'h-6 w-6') }}</span><span class="empty-title">{{ t('dash.no_payments', 'No payments yet.') }}</span></li>
+      </ul>
+    </div>{% endif %}
+  </div>
+</section>
+
+<!-- ============================== STUDENTS (master database) -->
+<section x-show="page === 'students'" x-cloak>
+  <div class="page-head">
+    <div>
+      <p class="eyebrow">{{ t('nav.group.academics', 'Academics') }}</p><h1 class="page-title" x-text="role === 'admin' ? MA.t('nav.students', 'Students') : MA.t('nav.my_students', 'My students')">{{ t('nav.students', 'Students') }}</h1>
+      <p class="page-sub" x-text="role === 'admin' ? MA.t('stu.sub_admin', 'Master database — open a student to manage subjects, marks, attendance, fees and login.') : MA.t('stu.sub_teacher', 'Students of the classes and sections you teach.')"></p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <button x-show="role === 'admin'" @click="openStudentForm()" class="btn btn-primary">{{ ic.icon('plus', 'h-4 w-4') }} Add student</button>
+      <label x-show="role === 'admin'" class="btn btn-light cursor-pointer">{{ ic.icon('upload', 'h-4 w-4') }} Import CSV<input type="file" accept=".csv,text/csv" class="hidden" @change="importCsv($event)"></label>
+      {% if user.role == 'admin' %}<a href="/api/students/export.csv" class="btn btn-light">{{ ic.icon('download', 'h-4 w-4') }} Export</a>{% endif %}
+      <a :href="'/print/students?class_id=' + (stuFilter.class_id || 0)" target="_blank" class="btn btn-light">{{ ic.icon('print', 'h-4 w-4') }} Print</a>
+    </div>
+  </div>
+  <div x-show="!classes.length" class="notice notice-warn mb-4" x-text="role === 'admin' ? 'No classes yet. Add classes and sections on the Classes page first.' : 'No classes are assigned to you yet. Ask the administrator to assign your subjects.'"></div>
+  <div class="card p-3 mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+    <div class="relative sm:col-span-2 lg:col-span-1"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">{{ ic.icon('search', 'h-4 w-4') }}</span>
+      <input x-model="stuFilter.q" @input.debounce.300ms="loadStudents()" placeholder="Search name, ID, admission no, phone…" class="input pl-9" aria-label="Search students"></div>
+    <select x-model="stuFilter.class_id" @change="stuFilter.section_id=''; loadStudents()" class="input" aria-label="Class">
+      <option value="">All classes</option>
+      <template x-for="c in classes" :key="c.id"><option :value="c.id" x-text="c.name"></option></template>
+    </select>
+    <select x-model="stuFilter.section_id" @change="loadStudents()" class="input" aria-label="Section">
+      <option value="">All sections</option>
+      <template x-for="s in sectionsOf(stuFilter.class_id)" :key="s.id"><option :value="s.id" x-text="'Section ' + s.name"></option></template>
+    </select>
+    <select x-model="stuFilter.status" @change="loadStudents()" class="input" aria-label="Status">
+      <option value="current">Current (not archived)</option><option value="">All statuses</option>
+      <template x-for="st in statuses" :key="st"><option :value="st" x-text="st"></option></template>
+    </select>
+  </div>
+
+  <!-- phones: cards -->
+  <ul class="md:hidden space-y-2" data-student-cards>
+    <template x-for="s in students" :key="s.id">
+      <li class="card p-3">
+        <div class="flex items-start gap-3">
+          <span class="h-11 w-11 shrink-0 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold overflow-hidden"><img x-show="s.photo" :src="s.photo" alt="" class="h-full w-full object-cover"><span x-show="!s.photo" x-text="(s.name || '?').slice(0, 1)"></span></span>
+          <div class="min-w-0 flex-1">
+            <a :href="'/student/' + s.id" class="block font-semibold text-slate-900 truncate hover:text-emerald-700" x-text="s.name"></a>
+            <p class="text-xs text-slate-500 truncate" x-text="'ID ' + s.student_id + ' · ' + s.class_name + ' - ' + s.section_name + (s.roll_no != null ? ' · Roll ' + s.roll_no : '')"></p>
+            <p class="text-xs text-slate-500 truncate" x-show="s.guardian_name || s.guardian_phone" x-text="(s.guardian_name || '') + (s.guardian_phone ? ' · ' + s.guardian_phone : '')"></p>
+          </div>
+          <span class="badge shrink-0" :class="MA.statusClass(s.status)" x-text="s.status"></span>
+        </div>
+        <div class="flex flex-wrap gap-2 mt-3">
+          <a :href="'/student/' + s.id" class="btn btn-soft btn-sm flex-1">Profile</a>
+          <a :href="'/student/' + s.id + '#subjects'" class="btn btn-light btn-sm" x-text="s.subject_count + ' subjects'"></a>
+          {% if user.role == 'admin' %}<a :href="'/student/' + s.id + '#login'" class="btn btn-light btn-sm" :aria-label="'Login of ' + s.name">{{ ic.icon('key', 'h-4 w-4') }}</a>{% endif %}
+          <button x-show="role === 'admin'" @click="openStudentForm(s)" class="btn btn-light btn-sm" :aria-label="'Edit ' + s.name">{{ ic.icon('edit', 'h-4 w-4') }}</button>
+          <button x-show="role === 'admin'" @click="deleteStudent(s)" class="btn btn-danger btn-sm" :aria-label="'Delete ' + s.name">{{ ic.icon('trash', 'h-4 w-4') }}</button>
+        </div>
+      </li>
+    </template>
+  </ul>
+
+  <!-- tablet and desktop: table -->
+  <div class="hidden md:block card scroll-x">
+    <table class="table min-w-[860px]">
+      <thead><tr>
+        <th class="th">ID</th><th class="th">Roll</th><th class="th">Name</th><th class="th">Class</th><th class="th">Guardian</th>
+        <th class="th">Phone</th><th class="th">Subjects</th><th class="th">Status</th><th class="th text-end">Actions</th>
+      </tr></thead>
+      <tbody>
+        <template x-for="s in students" :key="s.id">
+          <tr>
+            <td class="td font-mono text-xs text-slate-500" x-text="s.student_id"></td>
+            <td class="td" x-text="s.roll_no ?? '-'"></td>
+            <td class="td"><div class="flex items-center gap-2"><span class="h-8 w-8 shrink-0 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center text-xs font-bold overflow-hidden"><img x-show="s.photo" :src="s.photo" alt="" class="h-full w-full object-cover"><span x-show="!s.photo" x-text="(s.name||'?').slice(0,1)"></span></span><div><a :href="'/student/' + s.id" class="text-emerald-700 font-semibold hover:underline" x-text="s.name"></a><div class="text-xs text-slate-400" x-text="s.admission_no"></div></div></div></td>
+            <td class="td whitespace-nowrap" x-text="s.class_name + ' - ' + s.section_name"></td>
+            <td class="td" x-text="s.guardian_name || '-'"></td>
+            <td class="td whitespace-nowrap" x-text="s.guardian_phone || '-'"></td>
+            <td class="td"><a :href="'/student/' + s.id + '#subjects'" class="badge" :class="s.subject_count ? 'bg-indigo-50 text-indigo-700' : 'bg-amber-100 text-amber-700'" x-text="s.subject_count + ' subjects'"></a></td>
+            <td class="td">
+              <template x-if="role === 'admin'">
+                <select :value="s.status" @change="changeStatus(s, $event.target.value)" class="input-sm text-xs" :aria-label="'Status of ' + s.name">
+                  <template x-for="st in statuses" :key="st"><option :value="st" x-text="st" :selected="st === s.status"></option></template>
+                </select>
+              </template>
+              <template x-if="role !== 'admin'"><span class="badge" :class="MA.statusClass(s.status)" x-text="s.status"></span></template>
+            </td>
+            <td class="td text-end whitespace-nowrap">
+              <a :href="'/student/' + s.id" class="btn btn-light btn-sm">Profile</a>
+              {% if user.role == 'admin' %}<a :href="'/student/' + s.id + '#login'" class="btn btn-light btn-sm">{{ ic.icon('key', 'h-4 w-4') }} Login</a>{% endif %}
+              <button x-show="role === 'admin'" @click="openStudentForm(s)" class="btn btn-light btn-sm">Edit</button>
+              <button x-show="role === 'admin'" @click="deleteStudent(s)" class="btn btn-danger btn-sm">Delete</button>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+  <div x-show="!students.length" class="card mt-2"><div class="empty"><span class="empty-icon">{{ ic.icon('students', 'h-6 w-6') }}</span><span x-text="loading ? MA.t('common.loading', 'Loading…') : 'No students found.'"></span></div></div>
+  <p class="text-xs text-slate-500 mt-2" x-text="students.length + ' student(s) shown'"></p>
+  <details class="text-xs text-slate-500 mt-3 card p-3" x-show="role === 'admin'">
+    <summary class="cursor-pointer font-semibold text-slate-600 min-h-[28px]">CSV import columns</summary>
+    <p class="mt-2">name, class_name, section_name (required) · student_id, admission_no, roll_no, dob, gender, admission_date, status, guardian_name, guardian_relation, guardian_phone, address (optional). Dates as YYYY-MM-DD. In Excel use <i>File › Save As › CSV UTF-8</i>. A sample file is in <code>sample/students-import-sample.csv</code>.</p>
+  </details>
+</section>
+
+<!-- Student add/edit modal -->
+<div x-show="stuForm.open" x-cloak class="modal-back" @keydown.escape.window="stuForm.open=false">
+  <form @submit.prevent="saveStudent()" class="modal max-w-3xl" @click.outside="stuForm.open=false">
+    <div class="flex justify-between items-center mb-4"><h2 class="text-lg font-bold" x-text="stuForm.id ? 'Edit student' : 'Add student'"></h2><button type="button" @click="stuForm.open=false" class="btn-icon" aria-label="Close">{{ ic.icon('close') }}</button></div>
+    <div class="flex items-center gap-4 mb-4">
+      <span class="h-16 w-16 shrink-0 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xl overflow-hidden border">
+        <img x-show="stuForm.d.photo" :src="stuForm.d.photo" alt="" class="h-full w-full object-cover">
+        <span x-show="!stuForm.d.photo" x-text="(stuForm.d.name || '?').slice(0,1)"></span>
+      </span>
+      <div>
+        <label class="btn btn-light btn-sm cursor-pointer">Upload photo<input type="file" accept="image/png,image/jpeg,image/gif,image/webp" class="sr-only" @change="pickPhoto($event, stuForm.d)"></label>
+        <button type="button" x-show="stuForm.d.photo" @click="stuForm.d.photo = ''" class="btn btn-danger btn-sm ml-1">Remove</button>
+        <p class="help mt-1">PNG, JPG, GIF or WebP, max 300 KB.</p>
+      </div>
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div class="sm:col-span-2"><label class="label">Full name *</label><input x-model="stuForm.d.name" required maxlength="120" class="input"></div>
+      <div><label class="label">Student ID (6 digits, blank = auto)</label><input x-model="stuForm.d.student_id" maxlength="6" pattern="[0-9]{1,6}" class="input"></div>
+      <div><label class="label">Class *</label><select x-model="stuForm.d.class_id" @change="stuForm.d.section_id = (sectionsOf(stuForm.d.class_id)[0]||{}).id || ''" required class="input"><option value="">Select class</option><template x-for="c in classes" :key="c.id"><option :value="c.id" x-text="c.name" :selected="c.id == stuForm.d.class_id"></option></template></select></div>
+      <div><label class="label">Section *</label><select x-model="stuForm.d.section_id" required class="input"><option value="">Select section</option><template x-for="s in sectionsOf(stuForm.d.class_id)" :key="s.id"><option :value="s.id" x-text="s.name" :selected="s.id == stuForm.d.section_id"></option></template></select></div>
+      <div><label class="label">Roll no</label><input x-model="stuForm.d.roll_no" type="number" min="0" class="input"></div>
+      <div><label class="label">Admission no (blank = auto)</label><input x-model="stuForm.d.admission_no" maxlength="40" class="input"></div>
+      <div><label class="label">Admission date</label><input x-model="stuForm.d.admission_date" type="date" class="input"></div>
+      <div><label class="label">Date of birth</label><input x-model="stuForm.d.dob" type="date" class="input"></div>
+      <div><label class="label">Gender</label><select x-model="stuForm.d.gender" class="input"><option value="">—</option><option>Male</option><option>Female</option><option>Other</option></select></div>
+      <div><label class="label">Status</label><select x-model="stuForm.d.status" class="input"><template x-for="st in statuses" :key="st"><option :value="st" x-text="st" :selected="st === stuForm.d.status"></option></template></select></div>
+      <div><label class="label">Guardian name</label><input x-model="stuForm.d.guardian_name" maxlength="120" class="input"></div>
+      <div><label class="label">Relation</label><select x-model="stuForm.d.guardian_relation" class="input"><option>Father</option><option>Mother</option><option>Brother</option><option>Sister</option><option>Uncle</option><option>Aunt</option><option>Grandparent</option><option>Other</option></select></div>
+      <div><label class="label">Guardian phone</label><input x-model="stuForm.d.guardian_phone" maxlength="20" inputmode="tel" placeholder="01XXXXXXXXX" class="input"></div>
+      <div class="sm:col-span-2 lg:col-span-3"><label class="label">Address</label><input x-model="stuForm.d.address" maxlength="255" class="input"></div>
+      <div class="sm:col-span-2 lg:col-span-3"><label class="label">Notes</label><textarea x-model="stuForm.d.notes" maxlength="1000" rows="2" class="input"></textarea></div>
+      <label class="sm:col-span-2 lg:col-span-3 flex items-center gap-2 text-sm"><input type="checkbox" x-model="stuForm.d.apply_class_subjects"> <span x-text="stuForm.id ? 'If the class changes, add the new class\'s default subjects' : 'Assign the class\'s default subjects automatically'"></span></label>
+    </div>
+    <div class="flex gap-2 mt-5"><button class="btn btn-primary" :disabled="busy">Save student</button><button type="button" @click="stuForm.open=false" class="btn btn-light">Cancel</button></div>
+  </form>
+</div>
+
+<!-- ============================== CLASS ROUTINE -->
+<section x-show="page === 'routine'" x-cloak>
+  <div class="page-head">
+    <div><p class="eyebrow">{{ t('nav.group.academics', 'Academics') }}</p><h1 class="page-title">{{ t('nav.routine', 'Class routine') }}</h1><p class="page-sub">{{ t('rt.sub', "Weekly timetable of every class, each teacher's periods and who teaches which subject.") }}</p></div>
+    <div class="segmented" role="tablist" aria-label="Routine views">
+      <button type="button" role="tab" :aria-selected="rtTab === 'class'" @click="rtTab = 'class'; loadRtTab()" class="tab" :class="rtTab === 'class' ? 'tab-on' : 'tab-off'" data-rt-tab="class">{{ ic.icon('grid', 'h-4 w-4') }} By class</button>
+      <button type="button" role="tab" :aria-selected="rtTab === 'mine'" @click="rtTab = 'mine'; loadRtTab()" class="tab" :class="rtTab === 'mine' ? 'tab-on' : 'tab-off'" data-rt-tab="mine">{{ ic.icon('teacher', 'h-4 w-4') }} <span x-text="role === 'admin' ? 'By teacher' : 'My routine'"></span></button>
+      {% if user.role == 'admin' %}
+      <button type="button" role="tab" :aria-selected="rtTab === 'assign'" @click="rtTab = 'assign'; loadRtTab()" class="tab" :class="rtTab === 'assign' ? 'tab-on' : 'tab-off'" data-rt-tab="assign">{{ ic.icon('subjects', 'h-4 w-4') }} Teacher assignments</button>
+      <button type="button" role="tab" :aria-selected="rtTab === 'periods'" @click="rtTab = 'periods'; loadRtTab()" class="tab" :class="rtTab === 'periods' ? 'tab-on' : 'tab-off'" data-rt-tab="periods">{{ ic.icon('clock', 'h-4 w-4') }} Periods</button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- by class -->
+  <div x-show="rtTab === 'class'">
+    <div class="card p-3 mb-4 grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
+      <div><label class="label" for="rt-class">Class</label><select id="rt-class" x-model="rtSel.class_id" @change="rtPickClass()" class="input"><template x-for="c in classes" :key="c.id"><option :value="c.id" x-text="c.name" :selected="c.id == rtSel.class_id"></option></template></select></div>
+      <div><label class="label" for="rt-section">Section</label><select id="rt-section" x-model="rtSel.section_id" @change="loadClassRoutine()" class="input"><template x-for="s in sectionsOf(rtSel.class_id)" :key="s.id"><option :value="s.id" x-text="'Section ' + s.name" :selected="s.id == rtSel.section_id"></option></template></select></div>
+      <button type="button" @click="printClassRoutine()" class="btn btn-light" :disabled="!rtSel.section_id">{{ ic.icon('print', 'h-4 w-4') }} Print</button>
+    </div>
+    <p x-show="role === 'admin' && rt.periods.length" class="help mb-3">Tap a period to set the subject, teacher and room. The teacher assigned to the subject is chosen automatically.</p>
+    {% include "_routine_view.html" %}
+  </div>
+
+  <!-- by teacher / my routine -->
+  <div x-show="rtTab === 'mine'">
+    <div class="card p-3 mb-4 flex flex-col sm:flex-row sm:items-end gap-2">
+      {% if user.role == 'admin' %}<div class="flex-1"><label class="label" for="rt-teacher">Teacher</label><select id="rt-teacher" x-model="rtTeacher" @change="loadTeacherRoutine()" class="input"><template x-for="t in teachers" :key="t.id"><option :value="t.id" x-text="t.name + (t.role === 'admin' ? ' (admin)' : '') + (t.is_active ? '' : ' — disabled')" :selected="t.id == rtTeacher"></option></template></select></div>
+      {% else %}<div class="flex-1"><p class="font-semibold text-slate-900" x-text="rtMeta.teacher_name"></p><p class="card-sub">Your weekly periods across all classes.</p></div>{% endif %}
+      <button type="button" @click="printTeacherRoutine()" class="btn btn-light">{{ ic.icon('print', 'h-4 w-4') }} Print</button>
+    </div>
+    <div class="card card-pad mb-4" x-show="rtTab === 'mine'">
+      <h2 class="card-title mb-2">Today</h2>
+      <div class="flex flex-wrap gap-2">
+        <template x-for="c in todayList" :key="c.id"><span class="badge bg-emerald-50 text-emerald-800 py-1.5" x-text="c.start_time + ' ' + c.subject_name + ' · ' + c.class_name + '-' + c.section_name"></span></template>
+        <span x-show="!todayList.length" class="text-sm text-slate-500">No classes today.</span>
+      </div>
+    </div>
+    {% include "_routine_view.html" %}
+  </div>
+
+  {% if user.role == 'admin' %}
+  <!-- teacher assignments -->
+  <div x-show="rtTab === 'assign'" class="grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-4 items-start">
+    <form @submit.prevent="saveAssignment()" class="card card-pad space-y-3">
+      <h2 class="card-title">Assign a teacher to a subject</h2>
+      <p class="card-sub">Only the assigned teacher can enter marks for that subject, and is suggested on the routine. Leave the section empty to cover every section of the class.</p>
+      <div><label class="label" for="asg-teacher">Teacher *</label><select id="asg-teacher" x-model="newAsg.teacher_id" required class="input"><option value="">Choose…</option><template x-for="t in teachers" :key="t.id"><option :value="t.id" x-text="t.name + (t.is_active ? '' : ' (disabled)')"></option></template></select></div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="label" for="asg-class">Class *</label><select id="asg-class" x-model="newAsg.class_id" @change="newAsg.section_id = ''" required class="input"><option value="">Choose…</option><template x-for="c in classes" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select></div>
+        <div><label class="label" for="asg-section">Section</label><select id="asg-section" x-model="newAsg.section_id" class="input"><option value="">All sections</option><template x-for="s in sectionsOf(newAsg.class_id)" :key="s.id"><option :value="s.id" x-text="s.name"></option></template></select></div>
+      </div>
+      <div><label class="label" for="asg-subject">Subject *</label><select id="asg-subject" x-model="newAsg.subject_id" required class="input"><option value="">Choose…</option><template x-for="s in subjects" :key="s.id"><option :value="s.id" x-text="s.name"></option></template></select></div>
+      <button class="btn btn-primary w-full" :disabled="busy">{{ ic.icon('check', 'h-4 w-4') }} Save assignment</button>
+      <p class="help">A subject has one teacher per class (or section). Saving again replaces the teacher.</p>
+    </form>
+    <div class="card min-w-0">
+      <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2 border-b border-slate-100">
+        <select x-model="asgFilter.class_id" @change="loadAssignments()" class="input" aria-label="Filter by class"><option value="">All classes</option><template x-for="c in classes" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select>
+        <select x-model="asgFilter.teacher_id" @change="loadAssignments()" class="input" aria-label="Filter by teacher"><option value="">All teachers</option><template x-for="t in teachers" :key="t.id"><option :value="t.id" x-text="t.name"></option></template></select>
+      </div>
+      <ul class="divide-y divide-slate-100" data-assignments>
+        <template x-for="a in assignments" :key="a.id">
+          <li class="flex items-center gap-3 px-3 sm:px-4 py-2.5">
+            <span class="h-9 w-9 shrink-0 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-sm font-bold" x-text="(a.teacher_name || '?').slice(0, 1)"></span>
+            <span class="min-w-0 flex-1"><span class="block text-sm font-semibold text-slate-900 truncate" x-text="a.subject_name"></span><span class="block text-xs text-slate-500 truncate" x-text="a.class_name + (a.section_name ? ' - ' + a.section_name : ' (all sections)') + ' · ' + a.teacher_name"></span></span>
+            <button type="button" @click="deleteAssignment(a)" class="btn-icon text-red-600 hover:bg-red-50" :aria-label="'Remove ' + a.teacher_name + ' from ' + a.subject_name">{{ ic.icon('trash', 'h-4 w-4') }}</button>
+          </li>
+        </template>
+        <li x-show="!assignments.length" class="empty"><span class="empty-icon">{{ ic.icon('teacher', 'h-6 w-6') }}</span>No assignments yet.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- periods -->
+  <div x-show="rtTab === 'periods'" class="grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-4 items-start">
+    <form @submit.prevent="savePeriod()" class="card card-pad space-y-3">
+      <h2 class="card-title" x-text="perForm.id ? 'Edit period' : 'Add a period'"></h2>
+      <div><label class="label" for="per-name">Name *</label><input id="per-name" x-model="perForm.name" required maxlength="40" class="input" placeholder="e.g. 1st period, Tiffin break"></div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="label" for="per-start">Starts *</label><input id="per-start" type="time" x-model="perForm.start_time" required class="input"></div>
+        <div><label class="label" for="per-end">Ends *</label><input id="per-end" type="time" x-model="perForm.end_time" required class="input"></div>
+      </div>
+      <div class="grid grid-cols-2 gap-2 items-end">
+        <div><label class="label" for="per-order">Order</label><input id="per-order" type="number" min="0" max="99" x-model.number="perForm.order" class="input"></div>
+        <label class="flex items-center gap-2 text-sm min-h-[44px]"><input type="checkbox" x-model="perForm.is_break"> Break (no class)</label>
+      </div>
+      <div class="flex gap-2"><button class="btn btn-primary flex-1" :disabled="busy" x-text="perForm.id ? 'Save period' : 'Add period'"></button><button type="button" x-show="perForm.id" @click="editPeriod(null)" class="btn btn-light">Cancel</button></div>
+      <p class="help">Working days are chosen in Settings.</p>
+    </form>
+    <div class="card min-w-0">
+      <ul class="divide-y divide-slate-100" data-periods>
+        <template x-for="p in periodsList" :key="p.id">
+          <li class="flex items-center gap-3 px-3 sm:px-4 py-2.5" :class="p.is_break ? 'bg-amber-50/60' : ''">
+            <span class="w-24 shrink-0 text-sm font-semibold text-slate-800" x-text="p.start_time + '–' + p.end_time"></span>
+            <span class="min-w-0 flex-1 truncate text-sm" x-text="p.name"></span>
+            <span x-show="p.is_break" class="badge bg-amber-100 text-amber-800">Break</span>
+            <button type="button" @click="editPeriod(p)" class="btn-icon" :aria-label="'Edit ' + p.name">{{ ic.icon('edit', 'h-4 w-4') }}</button>
+            <button type="button" @click="deletePeriod(p)" class="btn-icon text-red-600 hover:bg-red-50" :aria-label="'Delete ' + p.name">{{ ic.icon('trash', 'h-4 w-4') }}</button>
+          </li>
+        </template>
+        <li x-show="!periodsList.length" class="empty"><span class="empty-icon">{{ ic.icon('clock', 'h-6 w-6') }}</span>No periods yet.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- cell editor -->
+  <div x-show="cellForm.open" x-cloak class="modal-back" @keydown.escape.window="cellForm.open = false" role="dialog" aria-modal="true" aria-labelledby="cell-title">
+    <form @submit.prevent="saveCell()" class="modal max-w-md" @click.outside="cellForm.open = false">
+      <div class="flex justify-between items-start gap-2 mb-4">
+        <div><h2 id="cell-title" class="text-lg font-bold text-slate-900" x-text="(rt.day_names[cellForm.day] || '') + ' · ' + (cellForm.period ? cellForm.period.name : '')"></h2>
+          <p class="card-sub" x-text="rtMeta.class_name + ' - ' + rtMeta.section_name + (cellForm.period ? ' · ' + cellForm.period.start_time + '–' + cellForm.period.end_time : '')"></p></div>
+        <button type="button" @click="cellForm.open = false" class="btn-icon" aria-label="Close">{{ ic.icon('close') }}</button>
+      </div>
+      <div class="space-y-3">
+        <div><label class="label" for="cell-subject">Subject *</label><select id="cell-subject" x-model="cellForm.subject_id" @change="cellPickSubject()" required class="input"><option value="">Choose…</option><template x-for="s in cellSubjects()" :key="s.id"><option :value="s.id" x-text="s.name" :selected="s.id == cellForm.subject_id"></option></template></select></div>
+        <div><label class="label" for="cell-teacher">Teacher</label><select id="cell-teacher" x-model="cellForm.teacher_id" class="input"><option value="">— none —</option><template x-for="t in teachers" :key="t.id"><option :value="t.id" x-text="t.name" :selected="t.id == cellForm.teacher_id"></option></template></select>
+          <p class="help" x-show="cellForm.subject_id && !rtMeta.default_teachers[String(cellForm.subject_id)]">No teacher is assigned to this subject yet — assign one in “Teacher assignments”.</p>
+          <p class="help text-amber-700" x-show="!cellAssigned()">This teacher is not the one assigned to the subject. Saving is blocked unless they are assigned.</p></div>
+        <div><label class="label" for="cell-room">Room</label><input id="cell-room" x-model="cellForm.room" maxlength="32" class="input" placeholder="e.g. Room 101"></div>
+      </div>
+      <div class="flex flex-wrap gap-2 mt-5">
+        <button class="btn btn-primary flex-1" :disabled="busy">Save</button>
+        <button type="button" x-show="cellForm.slot" @click="clearCell()" class="btn btn-danger" :disabled="busy">{{ ic.icon('trash', 'h-4 w-4') }} Clear</button>
+        <button type="button" @click="cellForm.open = false" class="btn btn-light">Cancel</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+</section>
+
+<!-- ============================== SUBJECTS -->
+<section x-show="page === 'subjects'" x-cloak>
+  <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+    <div><p class="eyebrow">{{ t('nav.group.academics', 'Academics') }}</p><h1 class="page-title" x-text="role === 'admin' ? MA.t('nav.subjects', 'Subjects') : MA.t('nav.my_subjects', 'My subjects')">{{ t('nav.subjects', 'Subjects') }}</h1><p class="text-sm text-slate-500" x-text="role === 'admin' ? 'Create subjects, set full / pass marks and credits, and choose default subjects for each class.' : 'The subjects and classes assigned to you. You can enter marks only for these.'"></p></div>
+    <button x-show="role === 'admin'" @click="openSubjectForm()" class="btn btn-primary">+ Add subject</button>
+  </div>
+  <div x-show="role !== 'admin'" class="mb-6" data-my-subjects>
+    <ul class="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+      <template x-for="a in assignments" :key="a.id">
+        <li class="card p-4 flex items-center gap-3"><span class="stat-icon bg-indigo-50 text-indigo-700">{{ ic.icon('subjects') }}</span>
+          <span class="min-w-0"><span class="block font-semibold text-slate-900 truncate" x-text="a.subject_name"></span><span class="block text-sm text-slate-500" x-text="a.class_name + (a.section_name ? ' - Section ' + a.section_name : ' (all sections)')"></span></span></li>
+      </template>
+    </ul>
+    <div x-show="!assignments.length" class="card"><div class="empty"><span class="empty-icon">{{ ic.icon('subjects', 'h-6 w-6') }}</span><span x-text="loading ? MA.t('common.loading', 'Loading…') : 'No subjects are assigned to you yet. Ask the administrator.'"></span></div></div>
+  </div>
+  <div class="card scroll-x mb-6" x-show="role === 'admin'">
+    <table class="table min-w-[760px]">
+      <thead><tr><th class="th">Subject</th><th class="th">Code</th><th class="th">Full</th><th class="th">Pass</th><th class="th">Credits</th><th class="th">Default for classes</th><th class="th">Students</th><th class="th">Status</th><th class="th text-end" x-show="role === 'admin'">Actions</th></tr></thead>
+      <tbody>
+        <template x-for="s in subjects" :key="s.id">
+          <tr>
+            <td class="td font-medium" x-text="s.name"></td><td class="td font-mono text-xs" x-text="s.code || '-'"></td>
+            <td class="td" x-text="s.max_marks"></td><td class="td" x-text="s.pass_marks ?? '-'"></td><td class="td" x-text="s.credits"></td>
+            <td class="td"><div class="flex flex-wrap gap-1 max-w-xs"><template x-for="cid in s.class_ids" :key="cid"><span class="badge bg-slate-100 text-slate-700" x-text="className(cid)"></span></template><span x-show="!s.class_ids.length" class="text-xs text-slate-400">none</span></div></td>
+            <td class="td" x-text="s.student_count"></td>
+            <td class="td"><span class="badge" :class="s.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'" x-text="s.is_active ? 'Active' : 'Inactive'"></span></td>
+            <td class="td text-end whitespace-nowrap" x-show="role === 'admin'"><button @click="openSubjectForm(s)" class="btn btn-light btn-sm">Edit</button> <button @click="deleteSubject(s)" class="btn btn-danger btn-sm">Delete</button></td>
+          </tr>
+        </template>
+        <tr x-show="!subjects.length"><td colspan="9" class="p-6 text-center text-slate-500">No subjects yet.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card p-5" x-show="role === 'admin'">
+    <h2 class="font-semibold mb-1">Default subjects per class</h2>
+    <p class="text-sm text-slate-500 mb-3">New students get these subjects automatically. Use “Apply to students” to add them to students already in the class (existing subjects are kept).</p>
+    <div class="flex flex-wrap gap-2 items-center mb-3">
+      <select x-model="classSubj.class_id" @change="pickClassSubjects()" class="input max-w-xs"><option value="">Choose a class…</option><template x-for="c in classes" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select>
+    </div>
+    <div x-show="classSubj.class_id">
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-3">
+        <template x-for="s in subjects" :key="s.id"><label class="flex items-center gap-2 text-sm border rounded-lg px-3 py-2" :class="classSubj.ids.includes(s.id) ? 'border-emerald-400 bg-emerald-50' : ''"><input type="checkbox" :value="s.id" :checked="classSubj.ids.includes(s.id)" @change="toggleClassSubject(s.id, $event.target.checked)"><span x-text="s.name"></span></label></template>
+      </div>
+      <div class="flex flex-wrap gap-2"><button @click="saveClassSubjects()" class="btn btn-primary" :disabled="busy">Save defaults</button><button @click="applyClassSubjects()" class="btn btn-dark" :disabled="busy">Apply to students in this class</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- Subject modal -->
+<div x-show="subForm.open" x-cloak class="modal-back" @keydown.escape.window="subForm.open=false">
+  <form @submit.prevent="saveSubject()" class="modal max-w-2xl">
+    <div class="flex justify-between items-center mb-4"><h2 class="text-lg font-bold" x-text="subForm.id ? 'Edit subject' : 'Add subject'"></h2><button type="button" @click="subForm.open=false" class="btn-icon" aria-label="Close">{{ ic.icon('close') }}</button></div>
+    <div class="grid sm:grid-cols-2 gap-3">
+      <div><label class="label">Name *</label><input x-model="subForm.d.name" required maxlength="80" class="input"></div>
+      <div><label class="label">Code</label><input x-model="subForm.d.code" maxlength="16" class="input"></div>
+      <div><label class="label">Full marks *</label><input x-model.number="subForm.d.max_marks" type="number" min="1" max="1000" step="any" required class="input"></div>
+      <div><label class="label">Pass marks</label><input x-model.number="subForm.d.pass_marks" type="number" min="0" max="1000" step="any" class="input"></div>
+      <div><label class="label">Credits (GPA weight)</label><input x-model.number="subForm.d.credits" type="number" min="0" max="20" step="0.5" class="input"></div>
+      <label class="flex items-center gap-2 text-sm mt-5"><input type="checkbox" x-model="subForm.d.is_active"> Active</label>
+      <div class="sm:col-span-2"><label class="label">Default subject for these classes</label>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-1 max-h-48 overflow-y-auto border rounded-lg p-2">
+          <template x-for="c in classes" :key="c.id"><label class="flex items-center gap-2 text-sm"><input type="checkbox" :checked="subForm.d.class_ids.includes(c.id)" @change="$event.target.checked ? subForm.d.class_ids.push(c.id) : subForm.d.class_ids = subForm.d.class_ids.filter(x => x !== c.id)"><span x-text="c.name"></span></label></template>
+        </div>
+      </div>
+    </div>
+    <div class="flex gap-2 mt-5"><button class="btn btn-primary" :disabled="busy">Save subject</button><button type="button" @click="subForm.open=false" class="btn btn-light">Cancel</button></div>
+  </form>
+</div>
+
+<!-- ============================== EXAMS & RESULTS -->
+<section x-show="page === 'exams'" x-cloak>
+  <p class="eyebrow">{{ t('nav.group.academics', 'Academics') }}</p><h1 class="page-title mb-1" x-text="role === 'admin' ? MA.t('nav.exams', 'Exams & Results') : MA.t('nav.marks_results', 'Marks & results')">{{ t('nav.exams', 'Exams & Results') }}</h1>
+  <div x-show="role !== 'admin' && !classes.length" x-cloak class="notice notice-info mb-3">No classes are assigned to you yet. Ask the administrator to assign your subjects.</div>
+  <p class="text-sm text-slate-500 mb-4" x-text="'Grading: ' + (scales[school.grading_scale] || '')"></p>
+  <div class="card p-3 mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 items-end">
+    <div><label class="label">Exam</label><select x-model="ex.exam_id" @change="loadExamView()" class="input"><template x-for="e in exams" :key="e.id"><option :value="e.id" x-text="e.name + (e.is_published ? '' : ' (draft)')" :selected="e.id == ex.exam_id"></option></template></select></div>
+    <div><label class="label">Class</label><select x-model="ex.class_id" @change="ex.section_id=''; loadExamView()" class="input"><template x-for="c in classes" :key="c.id"><option :value="c.id" x-text="c.name" :selected="c.id == ex.class_id"></option></template></select></div>
+    <div><label class="label">Section</label><select x-model="ex.section_id" @change="loadExamView()" class="input"><option value="">All sections</option><template x-for="s in sectionsOf(ex.class_id)" :key="s.id"><option :value="s.id" x-text="s.name"></option></template></select></div>
+    <div class="flex gap-1"><button @click="ex.tab='marks'; loadExamView()" :class="ex.tab==='marks' ? 'tab-on' : 'tab-off'" class="tab flex-1 border">Marks entry</button><button @click="ex.tab='results'; loadExamView()" :class="ex.tab==='results' ? 'tab-on' : 'tab-off'" class="tab flex-1 border">Results</button></div>
+  </div>
+  <div x-show="role === 'admin'" class="card p-3 mb-4 flex flex-wrap gap-2 items-center text-sm">
+    <span class="font-medium">Manage exams:</span>
+    <input x-model="newExam.name" placeholder="New exam name (e.g. Half Yearly)" maxlength="80" class="input max-w-xs">
+    <input x-model="newExam.exam_date" type="date" class="input max-w-[11rem]" aria-label="Exam date">
+    <button @click="createExam()" class="btn btn-dark">Add exam</button>
+    <template x-if="currentExam()"><span class="flex gap-2 items-center ml-auto">
+      <button @click="togglePublish()" class="btn btn-light btn-sm" x-text="currentExam().is_published ? 'Unpublish (hide from students)' : 'Publish to students'"></button>
+      <button @click="deleteExam()" class="btn btn-danger btn-sm">Delete exam</button></span></template>
+  </div>
+  <div x-show="!exams.length" class="notice notice-warn mb-4">No exams yet. An admin must add an exam first.</div>
+
+  <!-- marks entry -->
+  <div x-show="ex.tab === 'marks' && exams.length">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <div class="segmented" role="tablist" aria-label="Marks layout">
+        <button type="button" role="tab" :aria-selected="ex.view === 'subject'" @click="ex.view = 'subject'" class="tab" :class="ex.view === 'subject' ? 'tab-on' : 'tab-off'" data-marks-view="subject">{{ ic.icon('list', 'h-4 w-4') }} By subject</button>
+        <button type="button" role="tab" :aria-selected="ex.view === 'grid'" @click="ex.view = 'grid'" class="tab" :class="ex.view === 'grid' ? 'tab-on' : 'tab-off'" data-marks-view="grid">{{ ic.icon('grid', 'h-4 w-4') }} Grid</button>
+      </div>
+      <p x-show="role !== 'admin'" class="text-xs text-slate-500 flex items-center gap-1">{{ ic.icon('lock', 'h-4 w-4') }} You can enter marks only for subjects assigned to you.</p>
+    </div>
+
+    <!-- by subject: one subject, a list of students (best on phones) -->
+    <div x-show="ex.view === 'subject'" data-marks-subject>
+      <div class="card p-3 mb-3"><label class="label" for="mk-subject">Subject</label>
+        <select id="mk-subject" x-model="ex.subject_id" class="input"><template x-for="sub in sheet.subjects" :key="sub.id"><option :value="sub.id" x-text="sub.name + ' (/' + sub.max_marks + ')' + (canEdit(sub) ? '' : ' — view only')" :selected="sub.id == ex.subject_id"></option></template></select></div>
+      <ul class="card divide-y divide-slate-100" x-show="currentSubject()">
+        <template x-for="st in sheet.students" :key="st.id">
+          <li class="flex items-center gap-3 px-3 sm:px-4 py-2">
+            <span class="min-w-0 flex-1"><a :href="'/student/' + st.id" class="block text-sm font-medium text-slate-900 truncate hover:text-emerald-700" x-text="st.name"></a><span class="block text-xs text-slate-400" x-text="st.roll_no != null ? 'Roll ' + st.roll_no : ''"></span></span>
+            <template x-if="currentSubject() && st.subject_ids.includes(currentSubject().id) && canEdit(currentSubject())">
+              <input type="number" inputmode="decimal" min="0" :max="currentSubject().max_marks" step="any" class="input w-24 text-center" :value="st.marks[currentSubject().id] ?? ''" @input="setMark(st, currentSubject(), $event.target.value)" :class="markInvalid(st, currentSubject()) ? 'border-red-500 bg-red-50' : ''" :aria-label="st.name + ' ' + currentSubject().name">
+            </template>
+            <template x-if="currentSubject() && st.subject_ids.includes(currentSubject().id) && !canEdit(currentSubject())">
+              <span class="w-24 text-center text-sm text-slate-600 flex items-center justify-center gap-1">{{ ic.icon('lock', 'h-3.5 w-3.5 text-slate-400') }}<span x-text="st.marks[currentSubject().id] ?? '—'"></span></span>
+            </template>
+            <template x-if="currentSubject() && !st.subject_ids.includes(currentSubject().id)"><span class="w-24 text-center text-xs text-slate-300" title="Subject not assigned to this student">n/a</span></template>
+          </li>
+        </template>
+      </ul>
+    </div>
+
+    <!-- grid: every subject at once (wide screens) -->
+    <div x-show="ex.view === 'grid'" class="card scroll-x" data-marks-grid>
+      <table class="table">
+        <thead><tr><th class="th sticky left-0 z-10 bg-slate-50">Student</th><template x-for="sub in sheet.subjects" :key="sub.id"><th class="th text-center"><span class="inline-flex items-center gap-1"><span x-text="sub.name"></span><span x-show="!canEdit(sub)" title="View only — not assigned to you">{{ ic.icon('lock', 'h-3.5 w-3.5') }}</span></span><div class="font-normal normal-case text-[10px]" x-text="'/' + sub.max_marks"></div></th></template></tr></thead>
+        <tbody>
+          <template x-for="st in sheet.students" :key="st.id">
+            <tr>
+              <td class="td sticky left-0 z-10 bg-white whitespace-nowrap max-w-[11rem] truncate"><a :href="'/student/' + st.id" class="text-emerald-700 hover:underline" x-text="(st.roll_no != null ? st.roll_no + '. ' : '') + st.name"></a></td>
+              <template x-for="sub in sheet.subjects" :key="sub.id">
+                <td class="td text-center">
+                  <template x-if="st.subject_ids.includes(sub.id) && canEdit(sub)"><input type="number" inputmode="decimal" min="0" :max="sub.max_marks" step="any" class="input-sm w-20 text-center" :value="st.marks[sub.id] ?? ''" @input="setMark(st, sub, $event.target.value)" :class="markInvalid(st, sub) ? 'border-red-500 bg-red-50' : ''" :aria-label="st.name + ' ' + sub.name"></template>
+                  <template x-if="st.subject_ids.includes(sub.id) && !canEdit(sub)"><span class="text-sm text-slate-500" x-text="st.marks[sub.id] ?? '—'"></span></template>
+                  <template x-if="!st.subject_ids.includes(sub.id)"><span class="text-xs text-slate-300" title="Subject not assigned to this student">n/a</span></template>
+                </td>
+              </template>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+    <div x-show="!sheet.students.length" class="card mt-2"><div class="empty"><span class="empty-icon">{{ ic.icon('students', 'h-6 w-6') }}</span>No students in this class.</div></div>
+    <div x-show="sheet.students.length && !sheet.subjects.length" class="notice notice-warn mt-2">No subjects assigned. Set class default subjects on the Subjects page, then apply them to students.</div>
+    <div class="sticky bottom-0 z-20 -mx-4 md:mx-0 mt-3 px-4 md:px-0 py-3 bg-slate-50/95 backdrop-blur border-t md:border-0 border-slate-200 flex flex-wrap gap-2 items-center">
+      <button @click="saveMarks()" class="btn btn-primary" :disabled="busy || !Object.keys(dirty).length">Save marks</button>
+      <span class="text-sm text-slate-500" x-text="Object.keys(dirty).length ? Object.keys(dirty).length + ' unsaved change(s)' : 'All changes saved'"></span>
+      <span class="text-xs text-slate-400 hidden sm:inline">Clear a box to remove a mark. “n/a” = subject not taken by that student.</span>
+    </div>
+  </div>
+
+  <!-- results -->
+  <div x-show="ex.tab === 'results' && exams.length">
+    <div class="card scroll-x">
+      <table class="table min-w-[820px]">
+        <thead><tr><th class="th">Pos.</th><th class="th">Student</th><th class="th">Subjects (marks · grade)</th><th class="th">Total</th><th class="th">%</th><th class="th">GPA</th><th class="th">Grade</th><th class="th">Result</th><th class="th"></th></tr></thead>
+        <tbody>
+          <template x-for="r in results" :key="r.student_pk">
+            <tr class="align-top">
+              <td class="td font-semibold" x-text="r.position ?? '-'"></td>
+              <td class="td"><a :href="'/student/' + r.student_pk" class="text-emerald-700 font-medium hover:underline" x-text="r.student_name"></a><div class="text-xs text-slate-400" x-text="r.student_code + ' · ' + r.class_name + '-' + r.section_name"></div></td>
+              <td class="td text-xs"><div class="flex flex-wrap gap-1"><template x-for="s in r.subjects" :key="s.subject_id"><span class="badge" :class="MA.gradeClass(s.grade)" x-text="s.subject + ': ' + (s.marks ?? '-') + ' · ' + s.grade"></span></template></div></td>
+              <td class="td whitespace-nowrap" x-text="r.total_max ? r.total_obtained + '/' + r.total_max : '-'"></td>
+              <td class="td" x-text="r.percentage + '%'"></td>
+              <td class="td font-semibold" x-text="r.gpa.toFixed(2)"></td>
+              <td class="td"><span class="badge" :class="MA.gradeClass(r.grade)" x-text="r.grade"></span></td>
+              <td class="td"><span class="badge" :class="MA.statusClass(r.status)" x-text="r.status"></span></td>
+              <td class="td"><a :href="'/print/result/' + r.student_pk + '?exam_id=' + ex.exam_id" target="_blank" class="btn btn-light btn-sm">Card</a></td>
+            </tr>
+          </template>
+          <tr x-show="!results.length"><td colspan="9" class="p-6 text-center text-slate-500">No results.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <a :href="'/print/results?exam_id=' + ex.exam_id + '&class_id=' + (ex.class_id||0) + '&section_id=' + (ex.section_id||0)" target="_blank" class="btn btn-dark mt-3">Print all result cards</a>
+  </div>
+</section>
+
+<!-- ============================== ATTENDANCE -->
+<section x-show="page === 'attendance'" x-cloak>
+  <p class="eyebrow">{{ t('nav.group.academics', 'Academics') }}</p><h1 class="page-title mb-5">{{ t('att.title', 'Daily Attendance') }}</h1>
+  <div x-show="role !== 'admin' && !classes.length" x-cloak class="notice notice-info mb-3">No classes are assigned to you yet, so there is no attendance to take.</div>
+  <div class="card p-3 mb-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
+    <div><label class="label">Date</label><input type="date" x-model="att.date" :max="MA.today()" @change="loadAttendance()" class="input"></div>
+    <div><label class="label">Class</label><select x-model="att.class_id" @change="att.section_id=''; loadAttendance()" class="input"><template x-for="c in classes" :key="c.id"><option :value="c.id" x-text="c.name" :selected="c.id == att.class_id"></option></template></select></div>
+    <div><label class="label">Section</label><select x-model="att.section_id" @change="loadAttendance()" class="input"><option value="">All sections</option><template x-for="s in sectionsOf(att.class_id)" :key="s.id"><option :value="s.id" x-text="s.name"></option></template></select></div>
+  </div>
+  <div class="notice mb-3" :class="att.saved ? 'notice-info' : 'notice-warn'"><span x-text="att.saved ? 'Attendance for this day was already saved — you are editing it.' : 'Not saved yet for this day. Everyone starts as Present.'"></span></div>
+  <div class="flex flex-wrap gap-2 mb-3 text-xs" x-show="att.students.length">
+    <template x-for="opt in ['Present','Absent','Late','Leave']" :key="opt"><span class="badge" :class="({Present:'bg-emerald-100 text-emerald-800',Absent:'bg-red-100 text-red-700',Late:'bg-amber-100 text-amber-800',Leave:'bg-sky-100 text-sky-800'})[opt]" x-text="opt + ': ' + att.students.filter(s => s.status === opt).length"></span></template>
+  </div>
+  <ul class="card divide-y divide-slate-100 mb-3" data-attendance-list>
+    <template x-for="s in att.students" :key="s.id">
+      <li class="px-3 sm:px-4 py-2.5 flex flex-col sm:flex-row sm:items-center gap-2">
+        <span class="min-w-0 flex-1 flex items-center gap-2"><span class="w-8 shrink-0 text-xs font-semibold text-slate-400" x-text="s.roll_no ?? '-'"></span><a :href="'/student/' + s.id + '#attendance'" class="text-sm font-medium text-slate-900 truncate hover:text-emerald-700" x-text="s.name"></a></span>
+        <span class="grid grid-cols-4 gap-1 sm:w-[22rem] shrink-0" role="radiogroup" :aria-label="'Attendance of ' + s.name">
+          <template x-for="opt in ['Present','Absent','Late','Leave']" :key="opt"><button type="button" role="radio" :aria-checked="s.status === opt" @click="s.status = opt" class="btn btn-sm px-1 border" :class="s.status === opt ? ({Present:'bg-emerald-600 text-white border-emerald-600',Absent:'bg-red-600 text-white border-red-600',Late:'bg-amber-500 text-white border-amber-500',Leave:'bg-sky-600 text-white border-sky-600'})[opt] : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'" x-text="opt"></button></template>
+        </span>
+      </li>
+    </template>
+    <li x-show="!att.students.length" class="empty"><span class="empty-icon">{{ ic.icon('students', 'h-6 w-6') }}</span>No active students in this class.</li>
+  </ul>
+  <div class="sticky bottom-0 z-20 -mx-4 md:mx-0 px-4 md:px-0 py-3 bg-slate-50/95 backdrop-blur border-t md:border-0 border-slate-200 flex gap-2">
+    <button @click="att.students.forEach(s => s.status = 'Present')" class="btn btn-light">All present</button>
+    <button @click="saveAttendance()" class="btn btn-primary flex-1 sm:flex-none" :disabled="busy || !att.students.length">Save attendance</button>
+    <a :href="'/print/attendance?date=' + att.date + '&class_id=' + (att.class_id||0) + '&section_id=' + (att.section_id||0)" target="_blank" class="btn btn-light" aria-label="Print attendance sheet">{{ ic.icon('print', 'h-4 w-4') }}<span class="hidden sm:inline">Print</span></a>
+  </div>
+  <div class="card p-4 mt-6">
+    <h2 class="font-semibold mb-2">Monthly report</h2>
+    <div class="flex flex-wrap gap-2 mb-3"><input type="month" x-model="attReport.month" class="input max-w-[12rem]" aria-label="Month"><button @click="loadAttReport()" class="btn btn-dark">Show report for selected class</button></div>
+    <div class="scroll-x" x-show="attReport.rows.length"><table class="table"><thead><tr><th class="th">Student</th><th class="th">Present</th><th class="th">Absent</th><th class="th">Late</th><th class="th">Leave</th><th class="th">Days</th><th class="th">%</th></tr></thead>
+      <tbody><template x-for="r in attReport.rows" :key="r.id"><tr><td class="td" x-text="r.name"></td><td class="td" x-text="r.Present"></td><td class="td text-red-600" x-text="r.Absent"></td><td class="td" x-text="r.Late"></td><td class="td" x-text="r.Leave"></td><td class="td" x-text="r.total"></td><td class="td font-medium" x-text="r.percentage == null ? '-' : r.percentage + '%'"></td></tr></template></tbody></table></div>
+  </div>
+</section>
+
+{% if user.role == 'admin' %}
+<!-- ============================== TEACHERS (1.3.0, admin) -->
+<section x-show="page === 'teachers'" x-cloak data-page="teachers">
+  <div class="page-head">
+    <div>
+      <p class="eyebrow">{{ t('nav.group.academics', 'Academics') }}</p><h1 class="page-title">{{ t('nav.teachers', 'Teachers') }}</h1>
+      <p class="page-sub">{{ t('tch.sub', 'Add teachers, give them a login and see what they teach. A new teacher sets their own password at first login.') }}</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <button type="button" @click="openTeacherForm()" class="btn btn-primary" data-add-teacher>{{ ic.icon('plus', 'h-4 w-4') }} Add teacher</button>
+      <button type="button" @click="goAssign()" class="btn btn-light">{{ ic.icon('subjects', 'h-4 w-4') }} Assign subjects</button>
+    </div>
+  </div>
+  <div class="grid grid-cols-3 gap-3 mb-4">
+    <div class="stat"><span class="stat-icon hidden sm:flex bg-emerald-50 text-emerald-700">{{ ic.icon('teacher') }}</span><span class="min-w-0"><span class="stat-label block">Teachers</span><span class="stat-value block" x-text="teacherRows.length"></span></span></div>
+    <div class="stat"><span class="stat-icon hidden sm:flex bg-sky-50 text-sky-700">{{ ic.icon('check') }}</span><span class="min-w-0"><span class="stat-label block">Login active</span><span class="stat-value block" x-text="teacherRows.filter(t => t.is_active).length"></span></span></div>
+    <div class="stat"><span class="stat-icon hidden sm:flex bg-amber-50 text-amber-700">{{ ic.icon('key') }}</span><span class="min-w-0"><span class="stat-label block">First login pending</span><span class="stat-value block" x-text="teacherRows.filter(t => t.is_active && t.must_change_password).length"></span></span></div>
+  </div>
+  <div class="card p-3 mb-4">
+    <div class="relative"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">{{ ic.icon('search', 'h-4 w-4') }}</span>
+      <input x-model="teacherQ" placeholder="Search name, username, phone or subject…" class="input pl-9" aria-label="Search teachers"></div>
+  </div>
+
+  <!-- phones: cards -->
+  <ul class="md:hidden space-y-2" data-teacher-cards>
+    <template x-for="t in filteredTeachers()" :key="t.id">
+      <li class="card p-3">
+        <div class="flex items-start gap-3">
+          <span class="h-11 w-11 shrink-0 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold overflow-hidden"><img x-show="t.photo" :src="t.photo" alt="" class="h-full w-full object-cover"><span x-show="!t.photo" x-text="(t.full_name || t.username).slice(0, 1).toUpperCase()"></span></span>
+          <div class="min-w-0 flex-1">
+            <p class="font-semibold text-slate-900 truncate" x-text="t.full_name || t.username"></p>
+            <p class="text-xs text-slate-500 truncate" x-text="'@' + t.username + (t.phone ? ' · ' + t.phone : '')"></p>
+          </div>
+          <span class="badge shrink-0" :class="teacherBadge(t).cls" x-text="teacherBadge(t).text"></span>
+        </div>
+        <div class="space-y-1 mt-2">
+          <template x-for="g in teacherGroups(t)" :key="g.subject"><span class="block text-xs leading-5"><span class="badge bg-indigo-50 text-indigo-700" x-text="g.subject"></span> <span class="text-slate-600" x-text="g.classes"></span></span></template>
+          <span x-show="!t.assignments.length" class="text-xs text-amber-700">No subjects assigned yet</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2 mt-3">
+          <button type="button" @click="openTeacherForm(t)" class="btn btn-light btn-sm">{{ ic.icon('edit', 'h-4 w-4') }} Edit</button>
+          <button type="button" @click="goAssign(t)" class="btn btn-light btn-sm">{{ ic.icon('subjects', 'h-4 w-4') }} Assign</button>
+          <button type="button" @click="resetTeacherPassword(t)" class="btn btn-light btn-sm">{{ ic.icon('key', 'h-4 w-4') }} <span x-text="t.has_password ? 'Reset password' : 'Set password'"></span></button>
+          <button type="button" @click="toggleTeacher(t)" class="btn btn-sm" :class="t.is_active ? 'btn-danger' : 'btn-soft'" x-text="t.is_active ? 'Disable login' : 'Enable login'"></button>
+        </div>
+      </li>
+    </template>
+  </ul>
+
+  <!-- tablet and desktop: table -->
+  <div class="hidden md:block card scroll-x" data-teacher-table>
+    <table class="table min-w-[900px]">
+      <thead><tr><th class="th">Teacher</th><th class="th">Phone</th><th class="th">Subjects &amp; classes</th><th class="th">Periods / week</th><th class="th">Login</th><th class="th">Last login</th><th class="th text-end">Actions</th></tr></thead>
+      <tbody>
+        <template x-for="t in filteredTeachers()" :key="t.id">
+          <tr>
+            <td class="td"><div class="flex items-center gap-2"><span class="h-8 w-8 shrink-0 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center text-xs font-bold overflow-hidden"><img x-show="t.photo" :src="t.photo" alt="" class="h-full w-full object-cover"><span x-show="!t.photo" x-text="(t.full_name || t.username).slice(0,1).toUpperCase()"></span></span><div><span class="font-semibold text-slate-900" x-text="t.full_name || t.username"></span><div class="text-xs text-slate-400 font-mono" x-text="'@' + t.username"></div></div></div></td>
+            <td class="td whitespace-nowrap" x-text="t.phone || '-'"></td>
+            <td class="td"><div class="space-y-1 max-w-md">
+              <template x-for="g in teacherGroups(t)" :key="g.subject"><span class="block text-xs leading-5"><span class="badge bg-indigo-50 text-indigo-700" x-text="g.subject"></span> <span class="text-slate-600" x-text="g.classes"></span></span></template>
+              <button type="button" x-show="!t.assignments.length" @click="goAssign(t)" class="badge bg-amber-100 text-amber-800 hover:bg-amber-200">+ Assign subjects</button></div></td>
+            <td class="td" x-text="t.periods_per_week"></td>
+            <td class="td"><span class="badge" :class="teacherBadge(t).cls" x-text="teacherBadge(t).text"></span></td>
+            <td class="td whitespace-nowrap text-xs text-slate-500" x-text="t.last_login ? MA.when(t.last_login) : 'Never'"></td>
+            <td class="td text-end whitespace-nowrap">
+              <button type="button" @click="openTeacherForm(t)" class="btn btn-light btn-sm" :aria-label="'Edit ' + t.username">{{ ic.icon('edit', 'h-4 w-4') }}</button>
+              <button type="button" @click="goAssign(t)" class="btn btn-light btn-sm">Assign</button>
+              <button type="button" @click="resetTeacherPassword(t)" class="btn btn-light btn-sm" x-text="t.has_password ? 'Reset password' : 'Set password'"></button>
+              <button type="button" @click="toggleTeacher(t)" class="btn btn-sm" :class="t.is_active ? 'btn-danger' : 'btn-soft'" x-text="t.is_active ? 'Disable' : 'Enable'"></button>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+  <div x-show="!filteredTeachers().length" class="card mt-2"><div class="empty"><span class="empty-icon">{{ ic.icon('teacher', 'h-6 w-6') }}</span><span x-text="loading ? MA.t('common.loading', 'Loading…') : (teacherQ ? 'No teacher matches the search.' : 'No teachers yet. Click “Add teacher” to create the first one.')"></span></div></div>
+  <p class="help mt-3">Teachers see only their own classes: today's periods, their routine, attendance and the students of the classes they teach, and they can enter marks only for the subjects assigned to them. They never see fees, settings or other teachers. Sample teachers (demo data) have no password: use “Set password” to enable one.</p>
+</section>
+
+<!-- Teacher add/edit modal -->
+<div x-show="tForm.open" x-cloak class="modal-back" @keydown.escape.window="tForm.open = false" role="dialog" aria-modal="true" aria-labelledby="tform-title">
+  <form @submit.prevent="saveTeacher()" class="modal max-w-xl" data-teacher-form>
+    <div class="flex justify-between items-center mb-4"><h2 id="tform-title" class="text-lg font-bold" x-text="tForm.id ? 'Edit teacher' : 'Add teacher'"></h2><button type="button" @click="tForm.open = false" class="btn-icon" aria-label="Close">{{ ic.icon('close') }}</button></div>
+    <div class="flex items-center gap-4 mb-4">
+      <span class="h-16 w-16 shrink-0 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xl overflow-hidden border">
+        <img x-show="tForm.d.photo" :src="tForm.d.photo" alt="" class="h-full w-full object-cover">
+        <span x-show="!tForm.d.photo" x-text="(tForm.d.full_name || '?').slice(0,1)"></span>
+      </span>
+      <div>
+        <label class="btn btn-light btn-sm cursor-pointer">Upload photo<input type="file" accept="image/png,image/jpeg,image/gif,image/webp" class="sr-only" @change="pickPhoto($event, tForm.d)"></label>
+        <button type="button" x-show="tForm.d.photo" @click="tForm.d.photo = ''" class="btn btn-danger btn-sm ml-1">Remove</button>
+        <p class="help mt-1">PNG, JPG, GIF or WebP, max 300 KB.</p>
+      </div>
+    </div>
+    <div class="grid sm:grid-cols-2 gap-3">
+      <div class="sm:col-span-2"><label class="label" for="tf-name">Full name *</label><input id="tf-name" x-model="tForm.d.full_name" @input="suggestUsername()" required maxlength="120" class="input" placeholder="e.g. Maulana Abdur Rahim"></div>
+      <div><label class="label" for="tf-username">Username *</label><input id="tf-username" x-model="tForm.d.username" @input="tForm.touched = true" required minlength="3" maxlength="64" pattern="[A-Za-z0-9_.\-]+" class="input font-mono" autocapitalize="none" autocomplete="off">
+        <p class="help">Letters, digits, dot, dash or underscore. Used to log in.</p></div>
+      <div><label class="label" for="tf-phone">Phone (optional)</label><input id="tf-phone" x-model="tForm.d.phone" maxlength="20" inputmode="tel" class="input" placeholder="01XXXXXXXXX"></div>
+      <template x-if="!tForm.id">
+        <div class="sm:col-span-2"><label class="label" for="tf-password">Initial password</label>
+          <div class="flex gap-2">
+            <input id="tf-password" x-model="tForm.d.password" :type="tForm.show ? 'text' : 'password'" minlength="8" maxlength="128" class="input font-mono flex-1" autocomplete="new-password" placeholder="Leave empty to generate one">
+            <button type="button" @click="tForm.d.password = MA.genPassword(); tForm.show = true" class="btn btn-light shrink-0" data-generate>Generate</button>
+            <button type="button" @click="tForm.show = !tForm.show" class="btn btn-light shrink-0" x-text="tForm.show ? 'Hide' : 'Show'"></button>
+          </div>
+          <p class="help">At least 8 characters. The teacher must change it at first login.</p></div>
+      </template>
+    </div>
+    <div class="flex gap-2 mt-5"><button class="btn btn-primary" :disabled="busy" x-text="tForm.id ? 'Save changes' : 'Add teacher'"></button><button type="button" @click="tForm.open = false" class="btn btn-light">Cancel</button></div>
+  </form>
+</div>
+
+<!-- ============================== STUDENT LOGINS (1.3.0, admin) -->
+<section x-show="page === 'logins'" x-cloak data-page="logins">
+  <div class="page-head">
+    <div>
+      <p class="eyebrow">{{ t('nav.group.academics', 'Academics') }}</p><h1 class="page-title">{{ t('nav.logins', 'Student logins') }}</h1>
+      <p class="page-sub">{{ t('lg.sub', 'Give students a login to see their own results, attendance, fees and class routine. The username is the 6-digit student ID.') }}</p>
+    </div>
+  </div>
+  <div class="card p-3 mb-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
+    <select x-model="lg.class_id" @change="lg.section_id = ''; loadLogins()" class="input" aria-label="Class"><option value="">All classes</option><template x-for="c in classes" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select>
+    <select x-model="lg.section_id" @change="loadLogins()" class="input" aria-label="Section"><option value="">All sections</option><template x-for="s in sectionsOf(lg.class_id)" :key="s.id"><option :value="s.id" x-text="'Section ' + s.name"></option></template></select>
+    <input x-model="lg.q" @input.debounce.300ms="loadLogins()" placeholder="Search name or ID…" class="input" aria-label="Search students">
+  </div>
+  <div class="card card-pad mb-4 flex flex-col sm:flex-row sm:items-center gap-3" data-bulk-logins>
+    <span class="stat-icon bg-emerald-50 text-emerald-700">{{ ic.icon('key') }}</span>
+    <div class="min-w-0 flex-1">
+      <p class="font-semibold text-slate-900">Create logins for a whole class</p>
+      <p class="text-sm text-slate-500" x-text="lg.class_id ? (loginRows.filter(r => !r.has_login).length + ' student(s) in this list have no login yet.') : 'Choose a class first.'"></p>
+      <label class="flex items-center gap-2 text-sm mt-1"><input type="checkbox" x-model="lg.reset_existing"> Also give students who already have a login a new password</label>
+    </div>
+    <button type="button" @click="bulkLogins()" :disabled="busy || !lg.class_id" class="btn btn-primary">{{ ic.icon('print', 'h-4 w-4') }} Create &amp; print slips</button>
+  </div>
+
+  <ul class="md:hidden space-y-2">
+    <template x-for="r in loginRows" :key="r.id">
+      <li class="card p-3">
+        <div class="flex items-start gap-3">
+          <div class="min-w-0 flex-1"><a :href="'/student/' + r.id" class="font-semibold text-slate-900 truncate block" x-text="r.name"></a>
+            <p class="text-xs text-slate-500" x-text="'ID ' + r.student_id + ' · ' + r.class_name + ' - ' + r.section_name"></p></div>
+          <span class="badge shrink-0" :class="loginBadge(r).cls" x-text="loginBadge(r).text"></span>
+        </div>
+        <div class="flex flex-wrap gap-2 mt-3">
+          <button type="button" @click="studentLogin(r)" class="btn btn-light btn-sm flex-1" x-text="r.has_login ? 'Reset password' : 'Create login'"></button>
+          <button type="button" x-show="r.has_login" @click="toggleStudentLogin(r)" class="btn btn-sm" :class="r.is_active ? 'btn-danger' : 'btn-soft'" x-text="r.is_active ? 'Disable' : 'Enable'"></button>
+        </div>
+      </li>
+    </template>
+  </ul>
+  <div class="hidden md:block card scroll-x" data-login-table>
+    <table class="table min-w-[820px]">
+      <thead><tr><th class="th">ID</th><th class="th">Student</th><th class="th">Class</th><th class="th">Username</th><th class="th">Status</th><th class="th">Last login</th><th class="th text-end">Actions</th></tr></thead>
+      <tbody>
+        <template x-for="r in loginRows" :key="r.id">
+          <tr>
+            <td class="td font-mono text-xs text-slate-500" x-text="r.student_id"></td>
+            <td class="td"><a :href="'/student/' + r.id" class="text-emerald-700 font-semibold hover:underline" x-text="r.name"></a></td>
+            <td class="td whitespace-nowrap" x-text="r.class_name + ' - ' + r.section_name + (r.roll_no != null ? ' · Roll ' + r.roll_no : '')"></td>
+            <td class="td font-mono text-xs" x-text="r.username || '-'"></td>
+            <td class="td"><span class="badge" :class="loginBadge(r).cls" x-text="loginBadge(r).text"></span></td>
+            <td class="td whitespace-nowrap text-xs text-slate-500" x-text="r.last_login ? MA.when(r.last_login) : (r.has_login ? 'Never' : '-')"></td>
+            <td class="td text-end whitespace-nowrap">
+              <button type="button" @click="studentLogin(r)" class="btn btn-light btn-sm" x-text="r.has_login ? 'Reset password' : 'Create login'"></button>
+              <button type="button" x-show="r.has_login" @click="toggleStudentLogin(r)" class="btn btn-sm" :class="r.is_active ? 'btn-danger' : 'btn-soft'" x-text="r.is_active ? 'Disable' : 'Enable'"></button>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+  <div x-show="!loginRows.length" class="card mt-2"><div class="empty"><span class="empty-icon">{{ ic.icon('students', 'h-6 w-6') }}</span><span x-text="loading ? MA.t('common.loading', 'Loading…') : 'No students found.'"></span></div></div>
+  <p class="text-xs text-slate-500 mt-2" x-text="loginRows.filter(r => r.has_login).length + ' of ' + loginRows.length + ' student(s) have a login'"></p>
+</section>
+
+<!-- Credentials slip (shown once) -->
+<div x-show="cred.open" x-cloak class="modal-back" role="dialog" aria-modal="true" aria-labelledby="cred-title" data-cred-modal>
+  <div class="modal max-w-2xl">
+    <div class="flex justify-between items-center mb-2"><h2 id="cred-title" class="text-lg font-bold" x-text="cred.title"></h2><button type="button" @click="closeCred()" class="btn-icon" aria-label="Close">{{ ic.icon('close') }}</button></div>
+    <div class="notice notice-warn mb-3">{{ ic.icon('alert', 'h-5 w-5 shrink-0') }}<span>These passwords are shown <b>only once</b>. Print or download them now. Each person must choose a new password at first login.</span></div>
+    <div class="max-h-[50vh] overflow-y-auto divide-y border rounded-xl">
+      <template x-for="(c, i) in cred.rows" :key="i">
+        <div class="px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-sm">
+          <span class="min-w-0"><b x-text="c.name"></b> <span class="text-xs text-slate-500" x-text="c.extra || ''"></span></span>
+          <span class="font-mono text-xs sm:text-sm"><span class="text-slate-500">user</span> <b x-text="c.username" data-cred-user></b> <span class="text-slate-500 ml-2">password</span> <b x-text="c.password" data-cred-pass></b></span>
+        </div>
+      </template>
+      <p x-show="!cred.rows.length" class="p-4 text-sm text-slate-500">No new logins were needed: every student in this list already has one.</p>
+    </div>
+    <ul x-show="cred.skipped.length" class="mt-2 text-xs text-amber-800 list-disc pl-5"><template x-for="m in cred.skipped" :key="m"><li x-text="m"></li></template></ul>
+    <div class="flex flex-wrap gap-2 mt-4">
+      <button type="button" @click="printCred()" :disabled="!cred.rows.length" class="btn btn-primary">{{ ic.icon('print', 'h-4 w-4') }} Print slips</button>
+      <button type="button" @click="downloadCred()" :disabled="!cred.rows.length" class="btn btn-light">{{ ic.icon('download', 'h-4 w-4') }} Download CSV</button>
+      <button type="button" @click="closeCred()" class="btn btn-light">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== FEES -->
+<section x-show="page === 'fees'" x-cloak>
+  <p class="eyebrow">{{ t('nav.group.finance', 'Finance') }}</p><h1 class="page-title mb-5">{{ t('nav.fees', 'Fees') }}</h1>
+  <div class="grid lg:grid-cols-2 gap-5 mb-5">
+    <form @submit.prevent="pay()" class="card p-5 space-y-3">
+      <h2 class="font-semibold">Collect payment</h2>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="label">Class</label><select x-model="fee.class_id" @change="fee.student_id=''; loadFeeStudents()" class="input"><option value="">All classes</option><template x-for="c in classes" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select></div>
+        <div><label class="label">Search</label><input x-model="fee.q" @input.debounce.300ms="loadFeeStudents()" placeholder="Name / ID" class="input"></div>
+      </div>
+      <div><label class="label">Student *</label><select x-model="fee.student_id" @change="pickFeeStudent()" required class="input"><option value="">Select student</option><template x-for="s in feeStudents" :key="s.id"><option :value="s.id" x-text="s.name + ' (' + s.student_id + ', ' + s.class_name + ')'"></option></template></select></div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="label">Amount *</label><input type="number" x-model.number="fee.amount" min="1" step="any" required class="input"></div>
+        <div><label class="label">For month</label><input type="month" x-model="fee.fee_month" class="input"></div>
+        <div><label class="label">Fee head</label><input x-model="fee.fee_head" maxlength="64" class="input"></div>
+        <div><label class="label">Method</label><select x-model="fee.method" class="input"><template x-for="m in methods" :key="m"><option x-text="m"></option></template></select></div>
+      </div>
+      <div><label class="label">Note</label><input x-model="fee.note" maxlength="255" class="input"></div>
+      <p class="text-xs text-slate-500" x-show="fee.status" x-text="fee.status ? ('Monthly fee ' + MA.money(fee.status.monthly_fee, cur) + ' · Due this year ' + MA.money(fee.status.due, cur) + ' · Paid ' + MA.money(fee.status.paid, cur)) : ''"></p>
+      <button class="btn btn-primary w-full" :disabled="busy">Save & print receipt</button>
+    </form>
+    <div class="card p-5">
+      <h2 class="font-semibold mb-1">Monthly fee per class</h2>
+      <p class="text-xs text-slate-500 mb-3">Used to calculate dues (months since January or admission × monthly fee − payments this year).</p>
+      <div class="max-h-80 overflow-y-auto divide-y">
+        <template x-for="c in classes" :key="c.id"><div class="flex items-center justify-between gap-2 py-1.5 text-sm"><span x-text="c.name"></span><span class="flex gap-1"><input type="number" min="0" step="any" class="input-sm w-28" :value="c.monthly_fee" @change="setFeePlan(c, $event.target.value)" :aria-label="'Monthly fee ' + c.name"></span></div></template>
+      </div>
+    </div>
+  </div>
+  <div class="card p-5 mb-5">
+    <div class="flex flex-wrap justify-between items-center gap-2 mb-3"><h2 class="font-semibold">Fee dues (this year)</h2>
+      <div class="flex gap-2"><select x-model="dues.class_id" @change="loadDues()" class="input-sm"><option value="">All classes</option><template x-for="c in classes" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select>
+      <a :href="'/print/dues?class_id=' + (dues.class_id || 0)" target="_blank" class="btn btn-light btn-sm" data-print-dues>{{ ic.icon('print', 'h-4 w-4') }} Print due list</a></div></div>
+    <div class="scroll-x"><table class="table min-w-[640px]"><thead><tr><th class="th">Student</th><th class="th">Class</th><th class="th">Monthly</th><th class="th">Expected</th><th class="th">Paid</th><th class="th">Due</th></tr></thead>
+      <tbody><template x-for="r in dues.rows" :key="r.id"><tr><td class="td"><a :href="'/student/' + r.id + '#fees'" class="text-emerald-700 hover:underline" x-text="r.name"></a></td><td class="td" x-text="r.class_name"></td><td class="td" x-text="MA.money(r.monthly_fee, cur)"></td><td class="td" x-text="MA.money(r.expected, cur)"></td><td class="td" x-text="MA.money(r.paid, cur)"></td><td class="td font-semibold text-red-600" x-text="MA.money(r.due, cur)"></td></tr></template>
+      <tr x-show="!dues.rows.length"><td colspan="6" class="p-6 text-center text-slate-500">No dues. 🎉</td></tr></tbody></table></div>
+  </div>
+  <div class="card p-5">
+    <h2 class="font-semibold mb-3">Receipts</h2>
+    <div class="scroll-x"><table class="table min-w-[640px]"><thead><tr><th class="th">Receipt</th><th class="th">Date</th><th class="th">Student</th><th class="th">For</th><th class="th">Method</th><th class="th">Amount</th><th class="th"></th></tr></thead>
+      <tbody><template x-for="p in payments" :key="p.id"><tr :class="p.is_void ? 'opacity-50 line-through' : ''"><td class="td font-mono text-xs" x-text="p.receipt_no"></td><td class="td" x-text="p.date"></td><td class="td" x-text="p.student_name"></td><td class="td" x-text="(p.fee_head || '') + ' ' + (p.fee_month || '')"></td><td class="td" x-text="p.method"></td><td class="td font-medium" x-text="MA.money(p.amount, cur)"></td>
+        <td class="td text-end whitespace-nowrap"><a :href="'/print/receipt/' + p.id" target="_blank" class="btn btn-light btn-sm">Print</a> <button x-show="!p.is_void" @click="voidPayment(p)" class="btn btn-danger btn-sm">Void</button></td></tr></template>
+      <tr x-show="!payments.length"><td colspan="7" class="p-6 text-center text-slate-500">No receipts yet.</td></tr></tbody></table></div>
+  </div>
+</section>
+
+<!-- ============================== CLASSES -->
+<section x-show="page === 'classes'" x-cloak>
+  <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+    <p class="eyebrow">{{ t('nav.group.academics', 'Academics') }}</p><h1 class="page-title">{{ t('cls.title', 'Classes & Sections') }}</h1>
+    <form @submit.prevent="addClass()" class="flex gap-2 w-full sm:w-auto min-w-0"><input x-model="newClassName" placeholder="New class (e.g. Grade 11)" maxlength="64" class="input min-w-0" aria-label="New class name"><button class="btn btn-primary whitespace-nowrap">+ Add class</button></form>
+  </div>
+  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <template x-for="c in classes" :key="c.id">
+      <div class="card p-4 min-w-0">
+        <div class="flex flex-wrap justify-between items-start gap-2 mb-2">
+          <div class="min-w-0"><h3 class="font-semibold text-emerald-700" x-text="c.name"></h3><p class="text-xs text-slate-500" x-text="c.student_count + ' students · ' + c.subject_ids.length + ' default subjects · ' + MA.money(c.monthly_fee, cur) + '/month'"></p></div>
+          <div class="flex gap-1"><button @click="renameClass(c)" class="btn btn-light btn-sm">Rename</button><button @click="deleteClass(c)" class="btn btn-danger btn-sm">Delete</button></div>
+        </div>
+        <div class="flex flex-wrap gap-1 mb-2"><template x-for="sec in c.sections" :key="sec.id"><span class="badge bg-slate-100 text-slate-700 flex items-center gap-1"><span x-text="'Section ' + sec.name"></span><button @click="deleteSection(sec)" class="text-red-500 font-bold" :aria-label="'Delete section ' + sec.name">×</button></span></template></div>
+        <form @submit.prevent="addSection(c)" class="flex gap-1 min-w-0"><input x-model="newSection[c.id]" placeholder="New section" maxlength="32" class="input-sm flex-1 min-w-0 w-full" aria-label="New section name"><button class="btn btn-light btn-sm">+ Section</button></form>
+      </div>
+    </template>
+  </div>
+</section>
+
+<!-- ============================== SETTINGS (1.0.5: tabbed admin panel - everything a buyer needs without code) -->
+<section x-show="page === 'settings'" x-cloak data-page="settings">
+  <div class="page-head">
+    <div><p class="eyebrow">{{ t('nav.group.system', 'System') }}</p><h1 class="page-title">{{ t('nav.settings', 'Settings') }}</h1><p class="page-sub">{{ t('set.sub', 'Everything you need to run the software: no code changes required.') }}</p></div>
+  </div>
+  <div x-show="demoMode" x-cloak class="notice notice-warn mb-5" data-demo-secrets>{{ ic.icon('lock', 'h-5 w-5 shrink-0') }}<span>{{ t('set.demo_note', 'Public demo: you can change and save every setting, but passwords and API keys are never stored and test emails are not sent. Your own installation stores them encrypted.') }}</span></div>
+  <div class="grid lg:grid-cols-[15rem_minmax(0,1fr)] gap-5 lg:gap-8">
+    <nav class="set-nav lg:sticky lg:top-24 self-start rounded-2xl bg-slate-100/80 p-1.5" aria-label="{{ t('nav.settings', 'Settings') }}" data-settings-nav>
+      {% for id, icon, key, label in [('general', 'settings', 'set.tab_general', 'General'), ('branding', 'palette', 'set.tab_branding', 'Branding'), ('currencies', 'coins', 'set.tab_currencies', 'Currencies'), ('languages', 'globe', 'set.tab_languages', 'Languages'), ('email', 'mail', 'set.tab_email', 'Email (SMTP)'), ('payments', 'card', 'set.tab_payments', 'Payment gateways'), ('sms', 'message', 'set.tab_sms', 'SMS & integrations'), ('admins', 'shield', 'set.tab_admins', 'Administrators')] %}
+      <button type="button" class="set-link" :class="setTab === '{{ id }}' && 'set-link-on'" @click="openSetTab('{{ id }}')" data-set-tab="{{ id }}">{{ ic.icon(icon, 'h-[18px] w-[18px]') }} {{ t(key, label) }}</button>
+      {% endfor %}
+    </nav>
+    <div class="min-w-0">
+
+    <!-- ---------- General -->
+    <div x-show="setTab === 'general'" class="grid xl:grid-cols-2 gap-5" data-set-panel="general">
+      <form @submit.prevent="saveSettings()" class="card card-pad space-y-4" data-form="general">
+        <div><h2 class="card-title">{{ t('set.school_profile', 'School profile') }}</h2><p class="card-sub">{{ t('set.school_profile_sub', 'Shown on receipts, result cards and printouts.') }}</p></div>
+        <div><label class="label">{{ t('set.address', 'Address') }}</label><input x-model="school.address" maxlength="255" class="input"></div>
+        <div><label class="label">{{ t('set.office_phone', 'Office phone (shown on receipts)') }}</label><input x-model="school.phone" maxlength="32" class="input"></div>
+        <div><label class="label">{{ t('set.grading', 'Grading scale') }}</label><select x-model="school.grading_scale" class="input"><template x-for="(label, key) in scales" :key="key"><option :value="key" x-text="label" :selected="key === school.grading_scale"></option></template></select></div>
+        <button class="btn btn-primary" :disabled="busy" :aria-busy="busy ? 'true' : 'false'">{{ t('common.save', 'Save changes') }}</button>
+      </form>
+      <form @submit.prevent="saveSettings()" class="card card-pad" data-working-days>
+        <h2 class="card-title">{{ t('set.working_days', 'Working days') }}</h2>
+        <p class="card-sub mb-4">{{ t('set.working_days_sub', 'Days that appear on the class routine. Default: Saturday to Thursday.') }}</p>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
+          <template x-for="d in allDays" :key="d"><label class="flex items-center gap-2 text-sm border rounded-xl px-3 min-w-0 min-h-[44px] cursor-pointer transition-colors" :class="school.working_days.includes(d) ? 'border-brand-400 bg-brand-50' : 'border-slate-200'"><input type="checkbox" :checked="school.working_days.includes(d)" @change="toggleDay(d, $event.target.checked)"><span x-text="dayNames[d] || d"></span></label></template>
+        </div>
+        <button class="btn btn-primary" :disabled="busy" :aria-busy="busy ? 'true' : 'false'">{{ t('set.save_days', 'Save working days') }}</button>
+      </form>
+    </div>
+
+    <!-- ---------- Branding -->
+    <div x-show="setTab === 'branding'" x-cloak class="grid xl:grid-cols-2 gap-5" data-set-panel="branding">
+      <form @submit.prevent="saveBranding()" class="card card-pad space-y-4" data-form="branding">
+        <div><h2 class="card-title">{{ t('set.brand_identity', 'Name and colours') }}</h2><p class="card-sub">{{ t('set.brand_identity_sub', 'Applied to every page: login, landing page, menu, buttons and printouts.') }}</p></div>
+        <div><label class="label" for="set-app-name">{{ t('set.site_name', 'Site / institution name') }} *</label><input id="set-app-name" x-model="school.name" required maxlength="120" class="input" placeholder="e.g. Al-Noor Madrasa"></div>
+        <div><label class="label" for="set-tagline">{{ t('set.tagline', 'Tagline (optional)') }}</label><input id="set-tagline" x-model="school.tagline" maxlength="160" class="input" placeholder="e.g. School & Madrasa Management System"></div>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div><label class="label" for="set-primary">{{ t('set.primary', 'Primary colour') }}</label><div class="flex gap-2"><input id="set-primary" type="color" x-model="school.primary_color" class="input-color" data-color="primary"><input x-model="school.primary_color" maxlength="7" pattern="#[0-9A-Fa-f]{6}" class="input font-mono uppercase" aria-label="Primary colour hex"></div></div>
+          <div><label class="label" for="set-secondary">{{ t('set.secondary', 'Secondary colour') }}</label><div class="flex gap-2"><input id="set-secondary" type="color" x-model="school.secondary_color" class="input-color" data-color="secondary"><input x-model="school.secondary_color" maxlength="7" pattern="#[0-9A-Fa-f]{6}" class="input font-mono uppercase" aria-label="Secondary colour hex"></div></div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <template x-for="p in palettes" :key="p[0]"><button type="button" @click="school.primary_color = p[1]; school.secondary_color = p[2]" class="flex items-center gap-1.5 rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-slate-400"><span class="h-4 w-4 rounded-full" :style="'background:' + p[1]"></span><span class="h-4 w-4 rounded-full -ms-2.5 ring-2 ring-white" :style="'background:' + p[2]"></span><span x-text="p[0]"></span></button></template>
+        </div>
+        <div class="rounded-2xl border border-slate-200 p-4 flex flex-wrap items-center gap-3" aria-label="Preview">
+          <span class="rounded-xl px-4 py-2 text-sm font-semibold text-white" :style="'background:' + school.primary_color">{{ t('set.preview_button', 'Primary button') }}</span>
+          <span class="rounded-xl px-4 py-2 text-sm font-semibold text-white" :style="'background:' + school.secondary_color">{{ t('set.preview_accent', 'Accent') }}</span>
+          <span class="text-sm font-semibold" :style="'color:' + school.primary_color">{{ t('set.preview_link', 'Link text') }}</span>
+        </div>
+        <label class="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 p-4 cursor-pointer">
+          <span><span class="block text-sm font-semibold text-slate-800">{{ t('set.landing', 'Public landing page') }}</span><span class="block text-xs text-slate-500 mt-0.5">{{ t('set.landing_sub', 'On: "/" shows the landing page with the Live Demo / Sign in button. Off: "/" opens the login page.') }}</span></span>
+          <button type="button" role="switch" :aria-checked="school.landing_enabled" @click="school.landing_enabled = !school.landing_enabled" class="switch mt-1" :class="school.landing_enabled && 'switch-on'" data-switch="landing"><span class="switch-dot"></span></button>
+        </label>
+        <button class="btn btn-primary" :disabled="busy" :aria-busy="busy ? 'true' : 'false'">{{ t('set.save_branding', 'Save branding') }}</button>
+      </form>
+      <div class="card card-pad self-start" data-logo-card>
+        <h2 class="card-title">{{ t('set.logo', 'School logo') }}</h2>
+        <p class="card-sub mb-4">{{ t('set.logo_sub', 'Shown on the login page, the landing page, in the menu and on result cards, receipts and other printouts.') }}</p>
+        <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+          <span class="h-28 w-28 shrink-0 rounded-2xl border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center overflow-hidden mx-auto sm:mx-0">
+            <img x-show="school.logo" :src="school.logo" alt="Current school logo" class="h-full w-full object-contain p-1" data-logo-preview>
+            <span x-show="!school.logo" class="flex flex-col items-center gap-1 text-xs text-slate-400"><img src="/static/favicon.svg" alt="" class="h-10 w-10 opacity-60">{{ t('set.no_logo', 'No logo') }}</span>
+          </span>
+          <div class="flex-1 min-w-0 space-y-2">
+            <div class="grid grid-cols-2 gap-2">
+              <label class="btn btn-primary cursor-pointer" data-logo-change>{{ ic.icon('upload', 'h-4 w-4') }} <span x-text="school.logo ? MA.t('set.change_logo', 'Change logo') : MA.t('set.upload_logo', 'Upload logo')"></span>
+                <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" @change="changeLogo($event)" class="sr-only" data-logo-input></label>
+              <button type="button" @click="removeLogo()" :disabled="busy || !school.logo" class="btn btn-danger" data-logo-remove>{{ ic.icon('trash', 'h-4 w-4') }} {{ t('common.remove', 'Remove') }}</button>
+            </div>
+            <p class="help">{{ t('set.logo_help', 'PNG, JPG, GIF or WebP, max 300 KB. A square image looks best. Saved right away.') }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- Currencies -->
+    <div x-show="setTab === 'currencies'" x-cloak class="space-y-5" data-set-panel="currencies">
+      <div class="card">
+        <div class="card-head"><div><h2 class="card-title">{{ t('set.currencies', 'Currencies') }}</h2><p class="card-sub">{{ t('set.currencies_sub', 'The default currency is used for fees, receipts and reports. Others can be picked in the top bar to view amounts converted with the rate below.') }}</p></div></div>
+        <div class="scroll-x mt-3">
+          <table class="table min-w-[720px]" data-currency-table>
+            <thead><tr><th class="th">{{ t('set.code', 'Code') }}</th><th class="th">{{ t('set.name', 'Name') }}</th><th class="th">{{ t('set.symbol', 'Symbol') }}</th><th class="th">{{ t('set.rate', 'Rate (1 default =)') }}</th><th class="th">{{ t('set.decimals', 'Decimals') }}</th><th class="th">{{ t('set.status', 'Status') }}</th><th class="th"></th></tr></thead>
+            <tbody>
+              <template x-for="c in currencyRows" :key="c.id">
+                <tr :data-currency="c.code">
+                  <td class="td"><span class="font-mono font-semibold" x-text="c.code"></span> <span x-show="c.is_default" class="badge bg-brand-100 text-brand-800">{{ t('set.default', 'Default') }}</span></td>
+                  <td class="td"><input x-model="c.name" maxlength="60" class="input-sm w-40" :aria-label="'Name ' + c.code"></td>
+                  <td class="td"><input x-model="c.symbol" maxlength="8" class="input-sm w-20" :aria-label="'Symbol ' + c.code"></td>
+                  <td class="td"><input x-model.number="c.rate" type="number" step="any" min="0.000001" class="input-sm w-28" :disabled="c.is_default" :aria-label="'Rate ' + c.code"></td>
+                  <td class="td"><input x-model.number="c.decimals" type="number" min="0" max="4" class="input-sm w-16" :aria-label="'Decimals ' + c.code"></td>
+                  <td class="td"><button type="button" role="switch" :aria-checked="c.is_active" @click="if (!c.is_default) c.is_active = !c.is_active" class="switch" :class="c.is_active && 'switch-on'" :disabled="c.is_default"><span class="switch-dot"></span></button></td>
+                  <td class="td text-end whitespace-nowrap">
+                    <button type="button" @click="saveCurrency(c)" class="btn btn-light btn-sm" data-save-currency>{{ t('common.save_short', 'Save') }}</button>
+                    <button type="button" x-show="!c.is_default" @click="defaultCurrency(c)" class="btn btn-soft btn-sm" data-default-currency>{{ t('set.make_default', 'Make default') }}</button>
+                    <button type="button" x-show="!c.is_default" @click="deleteCurrency(c)" class="btn btn-danger btn-sm" :aria-label="'Delete ' + c.code">{{ ic.icon('trash', 'h-4 w-4') }}</button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <form @submit.prevent="addCurrency()" class="card card-pad" data-form="add-currency">
+        <h2 class="card-title mb-4">{{ t('set.add_currency', 'Add a currency') }}</h2>
+        <div class="grid sm:grid-cols-5 gap-3">
+          <div><label class="label">{{ t('set.code', 'Code') }}</label><input x-model="newCurrency.code" required minlength="3" maxlength="3" class="input uppercase" placeholder="EUR" data-new-currency-code></div>
+          <div class="sm:col-span-2"><label class="label">{{ t('set.name', 'Name') }}</label><input x-model="newCurrency.name" required maxlength="60" class="input" placeholder="Euro"></div>
+          <div><label class="label">{{ t('set.symbol', 'Symbol') }}</label><input x-model="newCurrency.symbol" required maxlength="8" class="input" placeholder="€"></div>
+          <div><label class="label">{{ t('set.rate_short', 'Rate') }}</label><input x-model.number="newCurrency.rate" type="number" step="any" min="0.000001" required class="input"></div>
+        </div>
+        <button class="btn btn-primary mt-4" :disabled="busy" :aria-busy="busy ? 'true' : 'false'">{{ ic.icon('plus', 'h-4 w-4') }} {{ t('set.add_currency', 'Add a currency') }}</button>
+      </form>
+    </div>
+
+    <!-- ---------- Languages -->
+    <div x-show="setTab === 'languages'" x-cloak class="space-y-5" data-set-panel="languages">
+      <div class="card">
+        <div class="card-head"><div><h2 class="card-title">{{ t('set.languages', 'Languages') }}</h2><p class="card-sub">{{ t('set.languages_sub', 'English, Bangla and Arabic (right-to-left) are built in. Add more languages and translate the interface below.') }}</p></div></div>
+        <ul class="divide-y divide-slate-100 mt-2">
+          <template x-for="l in languageRows" :key="l.id">
+            <li class="flex flex-wrap items-center gap-3 px-4 sm:px-6 py-3" :data-language="l.code">
+              <span class="h-10 w-10 shrink-0 rounded-xl bg-slate-100 font-mono text-sm font-bold text-slate-600 flex items-center justify-center uppercase" x-text="l.code"></span>
+              <span class="min-w-0 flex-1"><span class="block font-semibold text-slate-900"><span x-text="l.native_name || l.name"></span> <span class="text-slate-400 font-normal" x-text="'· ' + l.name"></span></span>
+                <span class="flex flex-wrap gap-1.5 mt-1"><span x-show="l.is_default" class="badge bg-brand-100 text-brand-800">{{ t('set.default', 'Default') }}</span><span x-show="l.is_rtl" class="badge bg-violet-100 text-violet-700">RTL</span><span x-show="l.builtin" class="badge bg-slate-100 text-slate-600">{{ t('set.builtin', 'Built in') }}</span><span x-show="!l.is_active" class="badge bg-red-100 text-red-700">{{ t('set.off', 'Off') }}</span></span></span>
+              <span class="flex flex-wrap gap-1.5">
+                <button type="button" @click="openTranslations(l)" class="btn btn-light btn-sm" data-translate>{{ ic.icon('edit', 'h-4 w-4') }} {{ t('set.translate', 'Translate') }}</button>
+                <button type="button" x-show="!l.is_default" @click="toggleLanguage(l)" class="btn btn-light btn-sm" x-text="l.is_active ? MA.t('set.switch_off', 'Switch off') : MA.t('set.switch_on', 'Switch on')"></button>
+                <button type="button" x-show="!l.is_default && l.is_active" @click="defaultLanguage(l)" class="btn btn-soft btn-sm" data-default-language>{{ t('set.make_default', 'Make default') }}</button>
+                <button type="button" x-show="!l.is_default && l.code !== 'en'" @click="deleteLanguage(l)" class="btn btn-danger btn-sm" :aria-label="'Delete ' + l.name">{{ ic.icon('trash', 'h-4 w-4') }}</button>
+              </span>
+            </li>
+          </template>
+        </ul>
+      </div>
+      <form @submit.prevent="addLanguage()" class="card card-pad" data-form="add-language">
+        <h2 class="card-title mb-4">{{ t('set.add_language', 'Add a language') }}</h2>
+        <div class="grid sm:grid-cols-4 gap-3 items-end">
+          <div><label class="label">{{ t('set.lang_code', 'Code (e.g. ur)') }}</label><input x-model="newLanguage.code" required minlength="2" maxlength="10" class="input lowercase" placeholder="ur" data-new-language-code></div>
+          <div><label class="label">{{ t('set.name', 'Name') }}</label><input x-model="newLanguage.name" required maxlength="60" class="input" placeholder="Urdu"></div>
+          <div><label class="label">{{ t('set.native_name', 'Native name') }}</label><input x-model="newLanguage.native_name" maxlength="60" class="input" placeholder="اردو"></div>
+          <label class="flex items-center gap-2 min-h-[44px] text-sm font-medium"><input type="checkbox" x-model="newLanguage.is_rtl"> {{ t('set.rtl', 'Right-to-left') }}</label>
+        </div>
+        <button class="btn btn-primary mt-4" :disabled="busy" :aria-busy="busy ? 'true' : 'false'">{{ ic.icon('plus', 'h-4 w-4') }} {{ t('set.add_language', 'Add a language') }}</button>
+      </form>
+      <div class="card" x-show="tr.lang" x-cloak data-translation-editor>
+        <div class="card-head flex-wrap"><div><h2 class="card-title">{{ t('set.translations', 'Translations') }}: <span x-text="tr.lang ? (tr.lang.native_name || tr.lang.name) : ''"></span></h2><p class="card-sub">{{ t('set.translations_sub', 'Leave a field empty to use the built-in text. Changes apply right after saving.') }}</p></div>
+          <div class="flex gap-2"><input x-model="tr.q" class="input-sm w-48" placeholder="{{ t('common.search', 'Search') }}" aria-label="Search translations"><button type="button" @click="saveTranslations()" class="btn btn-primary btn-sm" :disabled="busy || !Object.keys(tr.dirty).length" data-save-translations>{{ t('common.save', 'Save changes') }} <span x-show="Object.keys(tr.dirty).length" class="badge bg-white/20" x-text="Object.keys(tr.dirty).length"></span></button></div></div>
+        <div class="max-h-[32rem] overflow-y-auto mt-3 divide-y divide-slate-100">
+          <template x-for="it in trItems()" :key="it.key">
+            <div class="grid md:grid-cols-2 gap-2 px-4 sm:px-6 py-2.5">
+              <div class="min-w-0"><p class="text-sm text-slate-800" x-text="it.english"></p><p class="font-mono text-[11px] text-slate-400 truncate" x-text="it.key"></p></div>
+              <input :value="it.custom" @input="tr.dirty[it.key] = $event.target.value; it.custom = $event.target.value" :placeholder="it.builtin || it.english" :dir="tr.lang && tr.lang.is_rtl ? 'rtl' : 'ltr'" class="input-sm" :aria-label="'Translation of ' + it.key">
+            </div>
+          </template>
+          <p x-show="!trItems().length" class="empty py-8">{{ t('common.no_results', 'No matching items.') }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- Email (SMTP) -->
+    <div x-show="setTab === 'email'" x-cloak class="grid xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-5" data-set-panel="email">
+      <form @submit.prevent="saveConfig('smtp')" class="card card-pad space-y-4" data-form="smtp">
+        <div class="flex items-start justify-between gap-4"><div><h2 class="card-title">{{ t('set.smtp', 'SMTP email server') }}</h2><p class="card-sub">{{ t('set.smtp_sub', 'Used to send email from the app (for example test messages and notifications).') }}</p></div>
+          <button type="button" role="switch" :aria-checked="cfg.smtp.enabled" @click="cfg.smtp.enabled = !cfg.smtp.enabled" class="switch" :class="cfg.smtp.enabled && 'switch-on'" aria-label="SMTP enabled" data-switch="smtp"><span class="switch-dot"></span></button></div>
+        <div class="grid sm:grid-cols-3 gap-4">
+          <div class="sm:col-span-2"><label class="label" for="smtp-host">{{ t('set.smtp_host', 'Host') }}</label><input id="smtp-host" x-model="cfg.smtp.host" maxlength="255" class="input" placeholder="smtp.your-provider.org"></div>
+          <div><label class="label" for="smtp-port">{{ t('set.smtp_port', 'Port') }}</label><input id="smtp-port" x-model.number="cfg.smtp.port" type="number" min="1" max="65535" class="input"></div>
+        </div>
+        <div><label class="label">{{ t('set.smtp_security', 'Encryption') }}</label>
+          <div class="segmented"><template x-for="o in [['starttls', 'STARTTLS (587)'], ['ssl', 'SSL/TLS (465)'], ['none', 'None']]" :key="o[0]"><button type="button" class="tab" :class="cfg.smtp.security === o[0] ? 'tab-on' : 'tab-off'" @click="cfg.smtp.security = o[0]" x-text="o[1]"></button></template></div></div>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div><label class="label" for="smtp-user">{{ t('set.smtp_user', 'Username') }}</label><input id="smtp-user" x-model="cfg.smtp.username" maxlength="255" class="input" autocomplete="off"></div>
+          <div><label class="label" for="smtp-pass">{{ t('set.smtp_pass', 'Password') }} <span x-show="cfg.smtp.password_set" class="secret-set ms-1">{{ ic.icon('lock', 'h-3 w-3') }} {{ t('set.saved', 'saved') }}</span></label>
+            <input id="smtp-pass" x-model="cfg.smtp.password" type="password" maxlength="500" class="input" autocomplete="new-password" :placeholder="cfg.smtp.password_set ? cfg.smtp.password_mask + '  ' + MA.t('set.keep_blank', '(leave blank to keep)') : ''" data-secret="smtp.password">
+            <label x-show="cfg.smtp.password_set" class="flex items-center gap-2 mt-2 text-xs text-slate-600"><input type="checkbox" x-model="cfg.smtp.password_clear"> {{ t('set.remove_secret', 'Remove the saved value') }}</label></div>
+        </div>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div><label class="label" for="smtp-from">{{ t('set.smtp_from', 'From address') }}</label><input id="smtp-from" x-model="cfg.smtp.from_email" maxlength="255" class="input" type="email" placeholder="{{ t('set.smtp_from_ph', 'Sender email address') }}"></div>
+          <div><label class="label" for="smtp-from-name">{{ t('set.smtp_from_name', 'From name') }}</label><input id="smtp-from-name" x-model="cfg.smtp.from_name" maxlength="120" class="input" :placeholder="school.name"></div>
+        </div>
+        <button class="btn btn-primary" :disabled="busy" :aria-busy="busy ? 'true' : 'false'">{{ t('set.save_smtp', 'Save email settings') }}</button>
+      </form>
+      <form @submit.prevent="testEmail()" class="card card-pad self-start space-y-4" data-form="smtp-test">
+        <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-700">{{ ic.icon('mail') }}</span>
+        <div><h2 class="card-title">{{ t('set.test_email', 'Send a test email') }}</h2><p class="card-sub">{{ t('set.test_email_sub', 'Saves nothing. Sends one message with the saved settings.') }}</p></div>
+        <div><label class="label" for="smtp-test-to">{{ t('set.recipient', 'Recipient') }}</label><input id="smtp-test-to" x-model="testTo" type="email" required maxlength="254" class="input" placeholder="{{ t('set.recipient_ph', 'Your email address') }}"></div>
+        <button class="btn btn-dark w-full" :disabled="busy" :aria-busy="busy ? 'true' : 'false'" data-test-email>{{ ic.icon('mail', 'h-4 w-4') }} {{ t('set.send_test', 'Send test email') }}</button>
+      </form>
+    </div>
+
+    <!-- ---------- Payment gateways -->
+    <form x-show="setTab === 'payments'" x-cloak @submit.prevent="saveConfig('payments')" class="space-y-5" data-set-panel="payments" data-form="payments">
+      <p class="notice notice-info">{{ ic.icon('info', 'h-5 w-5 shrink-0') }}<span>{{ t('set.payments_note', 'Switched-on gateways appear as payment methods when collecting fees. Keys are stored encrypted and are never shown again.') }}</span></p>
+      <div class="grid xl:grid-cols-2 gap-5">
+        <template x-for="g in gateways" :key="g.id">
+          <div class="card card-pad space-y-4" :data-gateway="g.id">
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex items-center gap-3"><span class="h-11 w-11 rounded-xl flex items-center justify-center font-display font-extrabold text-white" :class="g.color" x-text="g.label.slice(0, 1)"></span><div><h2 class="card-title" x-text="g.label"></h2><p class="card-sub" x-text="g.desc"></p></div></div>
+              <button type="button" role="switch" :aria-checked="cfg.payments[g.id + '_enabled']" @click="cfg.payments[g.id + '_enabled'] = !cfg.payments[g.id + '_enabled']" class="switch" :class="cfg.payments[g.id + '_enabled'] && 'switch-on'" :aria-label="g.label + ' enabled'"><span class="switch-dot"></span></button>
+            </div>
+            <div class="segmented"><template x-for="m in g.modes" :key="m"><button type="button" class="tab capitalize" :class="cfg.payments[g.id + '_mode'] === m ? 'tab-on' : 'tab-off'" @click="cfg.payments[g.id + '_mode'] = m" x-text="m === 'live' ? MA.t('set.mode_live', 'Live') : (m === 'test' ? MA.t('set.mode_test', 'Test') : MA.t('set.mode_sandbox', 'Sandbox'))"></button></template></div>
+            <template x-for="f in g.fields" :key="f.name">
+              <div><label class="label"><span x-text="f.label"></span> <span x-show="f.secret && cfg.payments[f.name + '_set']" class="secret-set ms-1">{{ ic.icon('lock', 'h-3 w-3') }} {{ t('set.saved', 'saved') }}</span></label>
+                <input x-model="cfg.payments[f.name]" :type="f.secret ? 'password' : 'text'" maxlength="500" class="input font-mono text-sm" autocomplete="off" :placeholder="f.secret && cfg.payments[f.name + '_set'] ? cfg.payments[f.name + '_mask'] + '  ' + MA.t('set.keep_blank', '(leave blank to keep)') : (f.ph || '')" :data-secret="f.secret ? 'payments.' + f.name : null"></div>
+            </template>
+          </div>
+        </template>
+      </div>
+      <button class="btn btn-primary" :disabled="busy" :aria-busy="busy ? 'true' : 'false'">{{ t('set.save_payments', 'Save payment settings') }}</button>
+    </form>
+
+    <!-- ---------- SMS & integrations -->
+    <form x-show="setTab === 'sms'" x-cloak @submit.prevent="saveConfig('sms')" class="card card-pad space-y-4 max-w-3xl" data-set-panel="sms" data-form="sms">
+      <div class="flex items-start justify-between gap-4"><div><h2 class="card-title">{{ t('set.sms', 'SMS gateway') }}</h2><p class="card-sub">{{ t('set.sms_sub', 'API credentials for an SMS provider (for guardian notifications). Stored encrypted.') }}</p></div>
+        <button type="button" role="switch" :aria-checked="cfg.sms.enabled" @click="cfg.sms.enabled = !cfg.sms.enabled" class="switch" :class="cfg.sms.enabled && 'switch-on'" aria-label="SMS enabled"><span class="switch-dot"></span></button></div>
+      <div><label class="label">{{ t('set.sms_provider', 'Provider') }}</label><select x-model="cfg.sms.provider" class="input"><option value="twilio">Twilio</option><option value="bulksmsbd">BulkSMSBD</option><option value="custom">{{ t('set.sms_custom', 'Other (HTTP API)') }}</option></select></div>
+      <div><label class="label" for="sms-url">{{ t('set.sms_url', 'API URL (https)') }}</label><input id="sms-url" x-model="cfg.sms.api_url" maxlength="300" class="input font-mono text-sm" placeholder="https://"></div>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <template x-for="f in [['api_key', MA.t('set.api_key', 'API key')], ['api_secret', MA.t('set.api_secret', 'API secret / token')]]" :key="f[0]">
+          <div><label class="label"><span x-text="f[1]"></span> <span x-show="cfg.sms[f[0] + '_set']" class="secret-set ms-1">{{ ic.icon('lock', 'h-3 w-3') }} {{ t('set.saved', 'saved') }}</span></label>
+            <input x-model="cfg.sms[f[0]]" type="password" maxlength="500" class="input font-mono text-sm" autocomplete="off" :placeholder="cfg.sms[f[0] + '_set'] ? cfg.sms[f[0] + '_mask'] + '  ' + MA.t('set.keep_blank', '(leave blank to keep)') : ''" :data-secret="'sms.' + f[0]"></div>
+        </template>
+      </div>
+      <div><label class="label" for="sms-sender">{{ t('set.sender_id', 'Sender ID') }}</label><input id="sms-sender" x-model="cfg.sms.sender_id" maxlength="40" class="input"></div>
+      <button class="btn btn-primary" :disabled="busy" :aria-busy="busy ? 'true' : 'false'">{{ t('set.save_sms', 'Save SMS settings') }}</button>
+    </form>
+
+    <!-- ---------- Administrators -->
+    <div x-show="setTab === 'admins'" x-cloak class="card card-pad max-w-3xl" data-set-panel="admins">
+      <h2 class="card-title mb-1">{{ t('set.admins', 'Administrator accounts') }}</h2>
+      <p class="card-sub mb-4">Teachers are managed on the <a href="/dashboard#teachers" class="text-brand-700 font-medium hover:underline">Teachers</a> page and student logins on <a href="/dashboard#logins" class="text-brand-700 font-medium hover:underline">Student logins</a>.</p>
+      <div class="divide-y divide-slate-100 text-sm mb-5 rounded-2xl border border-slate-200">
+        <template x-for="u in users.filter(u => u.role === 'admin')" :key="u.id"><div class="px-4 py-3 flex flex-wrap items-center justify-between gap-2"><div class="flex items-center gap-3"><span class="h-9 w-9 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-bold uppercase" x-text="(u.full_name || u.username).slice(0, 1)"></span><div><b x-text="u.username"></b> <span class="text-slate-500" x-text="'· ' + (u.full_name||'')"></span> <span x-show="!u.is_active" class="badge bg-red-100 text-red-700">disabled</span> <span x-show="u.must_change_password && u.has_password" class="badge bg-amber-100 text-amber-700">must change password</span></div></div>
+          <div class="flex gap-1"><button @click="resetUserPassword(u)" class="btn btn-light btn-sm">Reset password</button><button @click="toggleUser(u)" class="btn btn-sm" :class="u.is_active ? 'btn-danger' : 'btn-light'" x-text="u.is_active ? 'Disable' : 'Enable'"></button></div></div></template>
+      </div>
+      <form @submit.prevent="createUser()" class="grid sm:grid-cols-2 gap-3 text-sm">
+        <input x-model="newUser.username" placeholder="Username" required minlength="3" maxlength="64" pattern="[A-Za-z0-9_.\-]+" class="input" aria-label="Admin username">
+        <input x-model="newUser.full_name" placeholder="Full name" required maxlength="120" class="input" aria-label="Admin full name">
+        <input x-model="newUser.password" type="password" placeholder="Temporary password (8+)" required minlength="8" maxlength="128" class="input sm:col-span-2" autocomplete="new-password" aria-label="Temporary password">
+        <button class="btn btn-dark sm:col-span-2">{{ ic.icon('plus', 'h-4 w-4') }} Add administrator</button>
+      </form>
+      <p class="text-xs text-slate-500 mt-2">New and reset accounts must change their password at first login.</p>
+    </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+</main>
+</div>
+</div>
+{% endblock %}

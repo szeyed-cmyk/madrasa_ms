@@ -1,0 +1,9 @@
+<div class="flex items-center gap-4 border-b-2 border-emerald-700 pb-3 mb-4">
+  {% if school.logo_path %}<img src="{{ school.logo_path }}" alt="" class="h-16 w-16 object-contain">{% endif %}
+  <div class="flex-1 text-center">
+    <h1 class="text-2xl font-bold text-emerald-800">{{ brand_name }}</h1>
+    {% if school.address %}<p class="text-sm text-slate-600">{{ school.address }}</p>{% endif %}
+    {% if school.phone %}<p class="text-xs text-slate-500">{{ school.phone }}</p>{% endif %}
+  </div>
+  {% if school.logo_path %}<div class="w-16"></div>{% endif %}
+</div>

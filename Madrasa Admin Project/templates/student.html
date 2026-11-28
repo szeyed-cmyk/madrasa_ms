@@ -1,0 +1,198 @@
+{% extends "_base.html" %}
+{% block title %}{{ student.name }} — {{ brand_name }}{% endblock %}
+{% block scripts %}<script src="/static/js/student.js?v={{ app_version }}" defer></script>{% endblock %}
+{% block body_attrs %}x-data="studentProfile()" x-init="init()" data-role="{{ user.role }}" data-student="{{ student_pk }}"{% endblock %}
+{% block body %}
+{% import "_icons.html" as ic %}
+<div class="lg:flex min-h-screen">
+{% include "_sidebar.html" %}
+<div class="flex-1 min-w-0 flex flex-col">
+{% with topbar_static=(t('nav.my_profile', 'My profile') if user.role == 'student' else t('student.profile', 'Student profile')) %}{% include "_topbar.html" %}{% endwith %}
+<main id="main" class="flex-1 min-w-0 w-full px-4 py-5 sm:px-6 md:py-8 lg:px-8 max-w-6xl mx-auto">
+  {% if user.role != 'student' %}<a href="/dashboard#students" class="btn btn-light btn-sm mb-3 no-print">{{ ic.icon('back', 'h-4 w-4') }} All students</a>{% endif %}
+  <div class="card p-4 sm:p-6 mb-5 bg-gradient-to-br from-white via-white to-brand-50 shadow-lift" x-show="d.id" x-cloak>
+    <div class="flex flex-wrap items-start gap-4">
+      <div class="h-16 w-16 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-700 text-white shadow-glow flex items-center justify-center text-2xl font-bold shrink-0" x-text="initials()"></div>
+      <div class="flex-1 min-w-0">
+        <div class="flex flex-wrap items-center gap-2"><h1 class="text-xl sm:text-2xl font-bold text-slate-900 break-words" x-text="d.name"></h1><span class="badge" :class="MA.statusClass(d.status)" x-text="d.status"></span></div>
+        <p class="text-sm text-slate-500" x-text="'ID ' + d.student_id + ' · ' + d.admission_no + ' · ' + d.class_name + ' - Section ' + d.section_name + (d.roll_no != null ? ' · Roll ' + d.roll_no : '')"></p>
+        <div class="flex flex-wrap gap-4 mt-2 text-sm">
+          <span><b x-text="d.subjects.length"></b> subjects</span>
+          <span x-show="d.result.subjects_marked">GPA <b x-text="d.result.gpa.toFixed(2)"></b> (<span x-text="d.exam ? d.exam.name : ''"></span>)</span>
+          <span x-show="d.attendance.percentage != null">Attendance <b x-text="d.attendance.percentage + '%'"></b></span>
+          <span x-show="d.fees" :class="d.fees && d.fees.due > 0 ? 'text-red-600' : 'text-emerald-700'">Fee due <b x-text="d.fees ? MA.money(d.fees.due, d.currency) : ''"></b></span>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-2 no-print w-full sm:w-auto sm:ms-auto">
+        <a :href="'/print/result/' + id + (exam_id ? '?exam_id=' + exam_id : '')" target="_blank" class="btn btn-dark" x-show="d.exam">Print result card</a>
+      </div>
+    </div>
+  </div>
+  <div class="flex gap-1 overflow-x-auto mb-4 no-print -mx-1 px-1 pb-1" role="tablist">
+    <template x-for="t in tabs()" :key="t.id"><a :href="'#' + t.id" role="tab" :aria-selected="tab === t.id" class="tab shrink-0" :class="tab === t.id ? 'tab-on' : 'tab-off bg-white border border-slate-200'" x-text="t.label"></a></template>
+  </div>
+
+  <!-- overview -->
+  <section x-show="tab === 'overview'" x-cloak class="grid lg:grid-cols-2 gap-4">
+    <div class="card p-5">
+      <div class="flex justify-between items-center mb-3"><h2 class="font-semibold">Student details</h2><button x-show="role === 'admin'" @click="editing = !editing" class="btn btn-light btn-sm" x-text="editing ? 'Close' : 'Edit'"></button></div>
+      <dl class="grid grid-cols-3 gap-y-2 text-sm" x-show="!editing">
+        <dt class="text-slate-500">Full name</dt><dd class="col-span-2" x-text="d.name"></dd>
+        <dt class="text-slate-500">Student ID</dt><dd class="col-span-2 font-mono" x-text="d.student_id"></dd>
+        <dt class="text-slate-500">Admission no</dt><dd class="col-span-2" x-text="d.admission_no"></dd>
+        <dt class="text-slate-500">Admission date</dt><dd class="col-span-2" x-text="d.admission_date || '-'"></dd>
+        <dt class="text-slate-500">Class</dt><dd class="col-span-2" x-text="d.class_name + ' - ' + d.section_name"></dd>
+        <dt class="text-slate-500">Roll</dt><dd class="col-span-2" x-text="d.roll_no ?? '-'"></dd>
+        <dt class="text-slate-500">Date of birth</dt><dd class="col-span-2" x-text="d.dob || '-'"></dd>
+        <dt class="text-slate-500">Gender</dt><dd class="col-span-2" x-text="d.gender || '-'"></dd>
+        <dt class="text-slate-500">Address</dt><dd class="col-span-2" x-text="d.address || '-'"></dd>
+        <dt class="text-slate-500">Notes</dt><dd class="col-span-2 whitespace-pre-line" x-text="d.notes || '-'"></dd>
+      </dl>
+      <form x-show="editing" @submit.prevent="saveDetails()" class="grid sm:grid-cols-2 gap-2 text-sm">
+        <div class="sm:col-span-2"><label class="label">Full name *</label><input x-model="f.name" required maxlength="120" class="input"></div>
+        <div><label class="label">Student ID</label><input x-model="f.student_id" maxlength="6" class="input"></div>
+        <div><label class="label">Admission no</label><input x-model="f.admission_no" maxlength="40" class="input"></div>
+        <div><label class="label">Class *</label><select x-model="f.class_id" @change="f.section_id = (sectionsOf(f.class_id)[0]||{}).id || ''" class="input"><template x-for="c in classes" :key="c.id"><option :value="c.id" x-text="c.name" :selected="c.id == f.class_id"></option></template></select></div>
+        <div><label class="label">Section *</label><select x-model="f.section_id" class="input"><template x-for="s in sectionsOf(f.class_id)" :key="s.id"><option :value="s.id" x-text="s.name" :selected="s.id == f.section_id"></option></template></select></div>
+        <div><label class="label">Roll no</label><input x-model="f.roll_no" type="number" min="0" class="input"></div>
+        <div><label class="label">Status</label><select x-model="f.status" class="input"><template x-for="st in ['Active','Inactive','Transferred','Graduated','Archived']" :key="st"><option :value="st" x-text="st" :selected="st === f.status"></option></template></select></div>
+        <div><label class="label">Admission date</label><input x-model="f.admission_date" type="date" class="input"></div>
+        <div><label class="label">Date of birth</label><input x-model="f.dob" type="date" class="input"></div>
+        <div><label class="label">Gender</label><select x-model="f.gender" class="input"><option value="">—</option><option>Male</option><option>Female</option><option>Other</option></select></div>
+        <div><label class="label">Guardian name</label><input x-model="f.guardian_name" maxlength="120" class="input"></div>
+        <div><label class="label">Relation</label><input x-model="f.guardian_relation" maxlength="32" class="input"></div>
+        <div><label class="label">Guardian phone</label><input x-model="f.guardian_phone" maxlength="20" class="input"></div>
+        <div class="sm:col-span-2"><label class="label">Address</label><input x-model="f.address" maxlength="255" class="input"></div>
+        <div class="sm:col-span-2"><label class="label">Notes</label><textarea x-model="f.notes" rows="2" maxlength="1000" class="input"></textarea></div>
+        <label class="sm:col-span-2 flex items-center gap-2"><input type="checkbox" x-model="f.apply_class_subjects"> If the class changes, add the new class's default subjects</label>
+        <div class="sm:col-span-2 flex gap-2"><button class="btn btn-primary" :disabled="busy">Save</button><button type="button" @click="editing=false" class="btn btn-light">Cancel</button></div>
+      </form>
+    </div>
+    <div class="card p-5">
+      <h2 class="font-semibold mb-3">Guardian</h2>
+      <dl class="grid grid-cols-3 gap-y-2 text-sm">
+        <dt class="text-slate-500">Name</dt><dd class="col-span-2" x-text="d.guardian_name || '-'"></dd>
+        <dt class="text-slate-500">Relation</dt><dd class="col-span-2" x-text="d.guardian_relation || '-'"></dd>
+        <dt class="text-slate-500">Phone</dt><dd class="col-span-2" x-text="d.guardian_phone || '-'"></dd>
+      </dl>
+      <h2 class="font-semibold mt-6 mb-2">At a glance</h2>
+      <div class="grid grid-cols-2 gap-2 text-sm">
+        <a href="#subjects" class="border rounded-lg p-3 hover:border-emerald-400"><p class="text-slate-500 text-xs">Subjects</p><p class="text-xl font-bold" x-text="d.subjects.length"></p></a>
+        <a href="#subjects" class="border rounded-lg p-3 hover:border-emerald-400"><p class="text-slate-500 text-xs">Result</p><p class="text-xl font-bold" x-text="d.result.status"></p></a>
+        <a href="#attendance" class="border rounded-lg p-3 hover:border-emerald-400"><p class="text-slate-500 text-xs">Attendance</p><p class="text-xl font-bold" x-text="d.attendance.percentage == null ? '-' : d.attendance.percentage + '%'"></p></a>
+        <a href="#fees" x-show="d.fees" class="border rounded-lg p-3 hover:border-emerald-400"><p class="text-slate-500 text-xs">Fee due</p><p class="text-xl font-bold" x-text="d.fees ? MA.money(d.fees.due, d.currency) : ''"></p></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- subjects & marks -->
+  <section x-show="tab === 'subjects'" x-cloak>
+    <div class="card p-4 mb-4 flex flex-wrap gap-2 items-end">
+      <div><label class="label">Exam</label><select x-model="exam_id" @change="load()" class="input"><template x-for="e in d.exams" :key="e.id"><option :value="e.id" x-text="e.name + (e.is_published ? '' : ' (draft)')" :selected="e.id == exam_id"></option></template></select></div>
+      <div class="text-sm text-slate-500 pb-2" x-show="!d.exams.length">No exams yet.</div>
+      <div class="ml-auto flex flex-wrap gap-2 items-end" x-show="staff">
+        <select x-model="addSubjId" class="input max-w-[14rem]" aria-label="Subject to add"><option value="">Add a subject…</option><template x-for="s in availableSubjects()" :key="s.id"><option :value="s.id" x-text="s.name"></option></template></select>
+        <button @click="addSubject()" class="btn btn-primary" :disabled="!addSubjId || busy">Add</button>
+        <button @click="applyDefaults()" class="btn btn-light" :disabled="busy" title="Add the default subjects of this student's class">Add class defaults</button>
+      </div>
+    </div>
+    <div class="card scroll-x">
+      <table class="table min-w-[640px]">
+        <thead><tr><th class="th">Subject</th><th class="th">Full</th><th class="th">Pass</th><th class="th">Credits</th><th class="th">Marks</th><th class="th">Grade</th><th class="th">GP</th><th class="th" x-show="staff"></th></tr></thead>
+        <tbody>
+          <template x-for="s in d.subjects" :key="s.subject_id">
+            <tr>
+              <td class="td font-medium"><span x-text="s.subject"></span> <span class="text-xs text-slate-400" x-text="s.code ? '(' + s.code + ')' : ''"></span> <span x-show="!d.class_default_subject_ids.includes(s.subject_id)" class="badge bg-sky-50 text-sky-700">extra</span></td>
+              <td class="td" x-text="s.max"></td><td class="td" x-text="s.pass_marks ?? '-'"></td><td class="td" x-text="s.credits"></td>
+              <td class="td">
+                <template x-if="staff && d.exam"><input type="number" min="0" :max="s.max" step="any" :value="s.marks ?? ''" @change="saveMark(s, $event.target)" class="input-sm w-24" :aria-label="'Marks ' + s.subject"></template>
+                <template x-if="!(staff && d.exam)"><span x-text="s.marks ?? '-'"></span></template>
+              </td>
+              <td class="td"><span class="badge" :class="MA.gradeClass(s.grade)" x-text="s.grade"></span></td>
+              <td class="td" x-text="s.grade_point == null ? '-' : s.grade_point.toFixed(2)"></td>
+              <td class="td text-end" x-show="staff"><button @click="removeSubject(s)" class="btn btn-danger btn-sm">Remove</button></td>
+            </tr>
+          </template>
+          <tr x-show="!d.subjects.length"><td colspan="8" class="p-6 text-center text-slate-500">No subjects assigned yet<span x-show="staff"> — use “Add class defaults” or pick a subject above</span>.</td></tr>
+        </tbody>
+        <tfoot x-show="d.subjects.length" class="border-t-2 bg-slate-50 font-semibold"><tr>
+          <td class="td">Total</td><td class="td" x-text="d.result.total_max"></td><td class="td"></td><td class="td"></td>
+          <td class="td" x-text="d.result.total_obtained + ' (' + d.result.percentage + '%)'"></td>
+          <td class="td"><span class="badge" :class="MA.gradeClass(d.result.grade)" x-text="d.result.grade"></span></td>
+          <td class="td" x-text="'GPA ' + d.result.gpa.toFixed(2)"></td><td class="td" x-show="staff"><span class="badge" :class="MA.statusClass(d.result.status)" x-text="d.result.status"></span></td>
+        </tr></tfoot>
+      </table>
+    </div>
+    <p class="text-xs text-slate-500 mt-2" x-show="!staff" data-student-marks-hint>Marks and grades of published exams. Ask your teacher if a mark looks wrong.</p>
+    <p class="text-xs text-slate-500 mt-2" x-show="staff" data-staff-marks-hint>Marks save automatically when you leave a box. Clear a box to remove the mark. Removing a subject hides it from results (its marks are kept and come back if the subject is added again).</p>
+  </section>
+
+  <!-- attendance -->
+  <section x-show="tab === 'attendance'" x-cloak>
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
+      <template x-for="(n, k) in d.attendance.counts" :key="k"><div class="card p-4"><p class="text-xs text-slate-500" x-text="k"></p><p class="text-2xl font-bold" x-text="n"></p></div></template>
+      <div class="card p-4"><p class="text-xs text-slate-500">Attendance %</p><p class="text-2xl font-bold text-emerald-600" x-text="d.attendance.percentage == null ? '-' : d.attendance.percentage + '%'"></p></div>
+    </div>
+    <div class="card scroll-x"><table class="table"><thead><tr><th class="th">Date</th><th class="th">Status</th><th class="th">Marked by</th></tr></thead>
+      <tbody><template x-for="a in d.attendance.recent" :key="a.date"><tr><td class="td" x-text="a.date"></td><td class="td"><span class="badge" :class="{Present:'bg-emerald-100 text-emerald-700',Absent:'bg-red-100 text-red-700',Late:'bg-amber-100 text-amber-700',Leave:'bg-sky-100 text-sky-700'}[a.status]" x-text="a.status"></span></td><td class="td" x-text="a.marked_by || '-'"></td></tr></template>
+      <tr x-show="!d.attendance.recent.length"><td colspan="3" class="p-6 text-center text-slate-500">No attendance recorded.</td></tr></tbody></table></div>
+  </section>
+
+  <!-- class routine -->
+  <section x-show="tab === 'routine'" x-cloak>
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <div><h2 class="card-title">Weekly class routine</h2><p class="card-sub" x-text="d.class_name + ' - Section ' + d.section_name"></p></div>
+      <a :href="'/print/routine?section_id=' + d.section_id" target="_blank" class="btn btn-light no-print">{{ ic.icon('print', 'h-4 w-4') }} Print</a>
+    </div>
+    {% include "_routine_view.html" %}
+  </section>
+
+  <!-- fees -->
+  <section x-show="tab === 'fees'" x-cloak>
+    <template x-if="d.fees"><div>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        <div class="card p-4"><p class="text-xs text-slate-500">Monthly fee</p><p class="text-xl font-bold" x-text="MA.money(d.fees.monthly_fee, d.currency)"></p></div>
+        <div class="card p-4"><p class="text-xs text-slate-500" x-text="'Expected (' + d.fees.months + ' months)'"></p><p class="text-xl font-bold" x-text="MA.money(d.fees.expected, d.currency)"></p></div>
+        <div class="card p-4"><p class="text-xs text-slate-500">Paid this year</p><p class="text-xl font-bold text-emerald-600" x-text="MA.money(d.fees.paid, d.currency)"></p></div>
+        <div class="card p-4"><p class="text-xs text-slate-500" x-text="d.fees.advance > 0 ? 'Advance' : 'Due'"></p><p class="text-xl font-bold" :class="d.fees.due > 0 ? 'text-red-600' : 'text-emerald-600'" x-text="MA.money(d.fees.advance > 0 ? d.fees.advance : d.fees.due, d.currency)"></p></div>
+      </div>
+      <form x-show="role === 'admin'" @submit.prevent="pay()" class="card p-4 mb-4 grid grid-cols-2 lg:grid-cols-6 gap-2 items-end text-sm">
+        <div><label class="label">Amount *</label><input type="number" min="1" step="any" x-model.number="payForm.amount" required class="input"></div>
+        <div><label class="label">For month</label><input type="month" x-model="payForm.fee_month" class="input"></div>
+        <div><label class="label">Fee head</label><input x-model="payForm.fee_head" maxlength="64" class="input"></div>
+        <div><label class="label">Method</label><select x-model="payForm.method" class="input"><template x-for="m in ['Cash','bKash','Nagad','Rocket','Bank','Card','Other']" :key="m"><option x-text="m"></option></template></select></div>
+        <div><label class="label">Note</label><input x-model="payForm.note" maxlength="255" class="input"></div>
+        <button class="btn btn-primary" :disabled="busy">Collect & print</button>
+      </form>
+      <div class="card scroll-x"><table class="table"><thead><tr><th class="th">Receipt</th><th class="th">Date</th><th class="th">For</th><th class="th">Method</th><th class="th">Amount</th><th class="th"></th></tr></thead>
+        <tbody><template x-for="p in d.payments" :key="p.id"><tr class="border-t" :class="p.is_void ? 'opacity-50 line-through' : ''"><td class="td font-mono text-xs" x-text="p.receipt_no"></td><td class="td" x-text="p.date"></td><td class="td" x-text="(p.fee_head||'') + ' ' + (p.fee_month||'')"></td><td class="td" x-text="p.method"></td><td class="td font-medium" x-text="MA.money(p.amount, d.currency)"></td><td class="td text-end"><template x-if="role === 'admin'"><a :href="'/print/receipt/' + p.id" target="_blank" class="btn btn-light btn-sm">Print</a></template></td></tr></template>
+        <tr x-show="!d.payments.length"><td colspan="6" class="p-6 text-center text-slate-500">No payments yet.</td></tr></tbody></table></div>
+    </div></template>
+  </section>
+
+  <!-- login (admin only: rendered on the server only for administrators) -->
+  {% if user.role == 'admin' %}
+  <section x-show="tab === 'login'" x-cloak>
+    <div class="card p-5 max-w-xl">
+      <h2 class="font-semibold mb-2">Student portal login</h2>
+      <p class="text-sm mb-3" x-show="d.login && d.login.has_login">Current login: <b x-text="d.login && d.login.username"></b>
+        <span class="badge" :class="d.login && d.login.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'" x-text="d.login && d.login.is_active ? 'active' : 'disabled'"></span>
+        <span x-show="d.login && d.login.must_change" class="badge bg-amber-100 text-amber-700">must change password</span></p>
+      <p class="text-sm text-slate-500 mb-3" x-show="d.login && !d.login.has_login">No login yet. The student can only see their own profile, published results, attendance and fees.</p>
+      <form @submit.prevent="createLogin()" class="grid sm:grid-cols-2 gap-2 text-sm">
+        <input x-model="loginForm.username" :placeholder="'Username (default ' + d.student_id + ')'" maxlength="64" class="input">
+        <input x-model="loginForm.password" type="password" placeholder="Password (blank = generate)" maxlength="128" class="input" autocomplete="new-password">
+        <div class="sm:col-span-2 flex gap-2"><button class="btn btn-dark" :disabled="busy" x-text="d.login && d.login.has_login ? 'Reset login' : 'Create login'"></button>
+          <button type="button" x-show="d.login && d.login.has_login && d.login.is_active" @click="disableLogin()" class="btn btn-danger">Disable login</button>
+          <button type="button" x-show="d.login && d.login.has_login && !d.login.is_active" @click="enableLogin()" class="btn btn-soft">Enable login</button></div>
+      </form>
+      <div x-show="tempPassword" class="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm" data-temp-password>Username: <b class="font-mono" x-text="tempUser"></b> · Temporary password: <b class="font-mono" x-text="tempPassword"></b><br><span class="text-xs">Give it to the student now — it is not shown again. They must change it at first login.</span>
+        <div class="mt-2"><button type="button" @click="printSlip()" class="btn btn-light btn-sm">Print login slip</button></div></div>
+      <p class="help mt-3">Tip: create logins for a whole class at once on the <a href="/dashboard#logins" class="text-emerald-700 font-medium hover:underline">Student logins</a> page.</p>
+    </div>
+  </section>
+  {% endif %}
+</main>
+</div>
+</div>
+{% endblock %}

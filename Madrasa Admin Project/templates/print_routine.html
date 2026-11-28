@@ -1,0 +1,37 @@
+{% extends "_print_base.html" %}
+{% block title %}{{ heading }}{% endblock %}
+{% block page_rule %}@page { size: A4 landscape; margin: 10mm; }{% endblock %}
+{% block content %}
+<div class="sheet bg-white max-w-6xl mx-auto my-6 p-6 shadow">
+  {% include "_print_header.html" %}
+  <h2 class="text-center text-lg font-semibold mb-3">{{ heading }}</h2>
+  <table class="w-full text-[11px] border border-slate-400 table-fixed">
+    <thead class="bg-slate-100">
+      <tr>
+        <th class="border border-slate-400 px-1 py-1 w-20">Day</th>
+        {% for p in periods %}<th class="border border-slate-400 px-1 py-1{% if p.is_break %} bg-amber-50{% endif %}">{{ p.name }}<div class="font-normal text-[10px] text-slate-600">{{ p.start_time }}–{{ p.end_time }}</div></th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in days %}
+      <tr>
+        <th class="border border-slate-400 px-1 py-2 bg-slate-50 text-start">{{ day_names[d] }}</th>
+        {% for p in periods %}
+          {% if p.is_break %}<td class="border border-slate-400 text-center text-slate-500 bg-amber-50 italic">Break</td>
+          {% else %}{% set c = cells.get((d, p.id)) %}
+          <td class="border border-slate-400 px-1 py-1 text-center align-top">
+            {% if c %}<div class="font-semibold">{{ c.subject_name }}</div>
+              {% if mode == 'class' %}<div class="text-slate-600">{{ c.teacher_name or '—' }}</div>{% else %}<div class="text-slate-600">{{ c.class_name }} - {{ c.section_name }}</div>{% endif %}
+              {% if c.room %}<div class="text-[10px] text-slate-500">{{ c.room }}</div>{% endif %}
+            {% else %}<span class="text-slate-300">—</span>{% endif %}
+          </td>{% endif %}
+        {% endfor %}
+      </tr>
+      {% else %}<tr><td class="p-3 text-center text-slate-500" colspan="{{ periods|length + 1 }}">No working days set.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not periods %}<p class="text-center text-slate-500 text-sm mt-3">No periods defined yet.</p>{% endif %}
+  <p class="text-[10px] text-slate-400 text-center mt-4">Printed {{ today }}</p>
+</div>
+{% endblock %}

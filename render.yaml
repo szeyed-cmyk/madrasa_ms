@@ -1,0 +1,46 @@
+# Render Blueprint for Madrasa Pro 1.0.8 (optional). See GITHUB-RENDER.md.
+# BUYER / PRODUCTION defaults: real login, no sample data, no demo mode, HTTPS cookies.
+# Builds the root Dockerfile. SQLite needs a persistent disk (Render paid plan).
+# A public sales demo uses different values (README "Demo" / docs/DATASHEET.md):
+#   DEMO_MODE=true, SEED_DEMO_DATA=true, COOKIE_SECURE=false, no ADMIN_* - set them in the
+#   Render dashboard of the demo service only, never on a real school's service.
+services:
+  - type: web
+    name: madrasa-pro
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    numInstances: 1
+    healthCheckPath: /healthz
+    disk:
+      name: madrasa-data
+      mountPath: /app/data
+      sizeGB: 1
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: HOST
+        value: "0.0.0.0"
+      - key: PORT
+        value: "8000"
+      - key: DATABASE_PATH
+        value: /app/data/madrasa.db
+      - key: SEED_DEMO_DATA
+        value: "false"
+      - key: DEMO_MODE
+        value: "false"
+      # WARNING: DEMO_LOGINS defaults to true when unset (the login page shows demo accounts).
+      # For a real school set it to false. Uncomment the two lines below.
+      # - key: DEMO_LOGINS
+      #   value: "false"
+      - key: SESSION_HOURS
+        value: "12"
+      # Optional first administrator: set as dashboard-only secrets (sync: false), never in this file.
+      # Leave both empty and open /setup right after the first deploy.
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false

@@ -12,7 +12,10 @@
   {% if user.role != 'student' %}<a href="/dashboard#students" class="btn btn-light btn-sm mb-3 no-print">{{ ic.icon('back', 'h-4 w-4') }} All students</a>{% endif %}
   <div class="card p-4 sm:p-6 mb-5 bg-gradient-to-br from-white via-white to-brand-50 shadow-lift" x-show="d.id" x-cloak>
     <div class="flex flex-wrap items-start gap-4">
-      <div class="h-16 w-16 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-700 text-white shadow-glow flex items-center justify-center text-2xl font-bold shrink-0" x-text="initials()"></div>
+      <div class="h-16 w-16 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-700 text-white shadow-glow flex items-center justify-center text-2xl font-bold shrink-0 overflow-hidden">
+        <img x-show="d.photo" :src="d.photo" alt="" class="h-full w-full object-cover">
+        <span x-show="!d.photo" x-text="initials()"></span>
+      </div>
       <div class="flex-1 min-w-0">
         <div class="flex flex-wrap items-center gap-2"><h1 class="text-xl sm:text-2xl font-bold text-slate-900 break-words" x-text="d.name"></h1><span class="badge" :class="MA.statusClass(d.status)" x-text="d.status"></span></div>
         <p class="text-sm text-slate-500" x-text="'ID ' + d.student_id + ' · ' + d.admission_no + ' · ' + d.class_name + ' - Section ' + d.section_name + (d.roll_no != null ? ' · Roll ' + d.roll_no : '')"></p>

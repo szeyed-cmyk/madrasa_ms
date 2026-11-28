@@ -55,7 +55,11 @@
   </nav>
   <div class="relative p-3 border-t border-white/[0.07] text-sm">
     <div class="flex items-center gap-3 rounded-xl bg-white/[0.04] px-3 py-2.5">
-      <span class="h-9 w-9 rounded-full bg-gradient-to-br from-brand-400 to-brand-700 text-white flex items-center justify-center text-sm font-bold uppercase shrink-0">{{ (user.full_name or user.username)[:1] }}</span>
+      
+            
+      {% set avatar_photo = user.photo or (student.photo if student is defined else none) %}
+      <span class="h-9 w-9 rounded-full bg-gradient-to-br from-brand-400 to-brand-700 text-white flex items-center justify-center text-sm font-bold uppercase overflow-hidden shrink-0">{% if avatar_photo %}<img src="{{ avatar_photo }}" alt="" class="h-full w-full object-cover">{% else %}{{ (user.full_name or user.username)[:1] }}{% endif %}</span>
+      {% set avatar_photo = user.photo or (student.photo if student is defined else none) %}
       <span class="min-w-0 flex-1"><span class="block font-semibold text-white truncate">{{ user.full_name or user.username }}</span><span class="block text-xs text-slate-400">{{ t('role.' ~ user.role, user.role|capitalize) }}</span></span>
     </div>
     <p class="text-[10px] text-slate-500 px-2 pt-3">v{{ app_version }} · Developer: Syed Abue Tayeb Al-Zeyed</p>
